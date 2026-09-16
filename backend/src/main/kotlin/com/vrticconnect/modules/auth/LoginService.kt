@@ -6,6 +6,7 @@ import com.vrticconnect.http.ProblemException
 import io.ktor.http.HttpHeaders
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receive
+import io.ktor.server.request.receiveOrNull
 import io.ktor.server.response.respond
 import kotlinx.serialization.Serializable
 import java.sql.Connection
@@ -114,8 +115,8 @@ class LoginService(
     }
 
     suspend fun refresh(call: ApplicationCall) {
-        val request = call.receive<RefreshRequest>()
-        val refreshToken = request.refreshToken?.trim()
+        val request = call.receiveOrNull<RefreshRequest>()
+        val refreshToken = (request?.refreshToken ?: call.request.cookies["vc_refresh"])?.trim()
             ?.takeIf { Tokens.isRefreshToken(it) }
             ?: throw ProblemException.invalidCredentials()
 
@@ -168,10 +169,19 @@ class LoginService(
                         refreshTokenExpiresAt = refreshExpires.toString(),
                     ),
                 ),
+                current.clientKind == "WEB",
             )
         }
         when (result) {
-            is RefreshOutcome.Issued -> call.respond(result.value)
+            is RefreshOutcome.Issued -> {
+                if (result.web && result.value.tokens != null) {
+                    appendTokenCookie(call, "vc_access", result.value.tokens.accessToken, 600, "/api")
+                    appendTokenCookie(call, "vc_refresh", result.value.tokens.refreshToken, 604_800, "/api/v1/auth/refresh")
+                    call.respond(result.value.copy(tokens = null))
+                } else {
+                    call.respond(result.value)
+                }
+            }
             RefreshOutcome.Reused -> throw ProblemException.refreshReuseDetected()
         }
     }
@@ -254,7 +264,7 @@ class LoginService(
 
     private fun findRefreshToken(connection: Connection, token: String): RefreshRecord? =
         connection.prepareStatement(
-            "SELECT rt.id, rt.session_id, rt.consumed_at, rt.idle_expires_at, " +
+            "SELECT rt.id, rt.session_id, rt.consumed_at, rt.idle_expires_at, s.client_kind, " +
                 "s.revoked_at AS session_revoked_at, s.absolute_expires_at, u.status AS user_status " +
                 "FROM app.refresh_tokens rt " +
                 "JOIN app.sessions s ON s.id = rt.session_id " +
@@ -269,6 +279,7 @@ class LoginService(
                     sessionId = result.getObject("session_id", UUID::class.java),
                     consumedAt = result.getTimestamp("consumed_at")?.toInstant(),
                     idleExpiresAt = result.getTimestamp("idle_expires_at").toInstant(),
+                    clientKind = result.getString("client_kind"),
                     sessionRevokedAt = result.getTimestamp("session_revoked_at")?.toInstant(),
                     absoluteExpiresAt = result.getTimestamp("absolute_expires_at").toInstant(),
                     userStatus = result.getString("user_status"),
@@ -318,13 +329,14 @@ class LoginService(
         val sessionId: UUID,
         val consumedAt: Instant?,
         val idleExpiresAt: Instant,
+        val clientKind: String,
         val sessionRevokedAt: Instant?,
         val absoluteExpiresAt: Instant,
         val userStatus: String,
     )
 
     private sealed interface RefreshOutcome {
-        data class Issued(val value: AuthResult) : RefreshOutcome
+        data class Issued(val value: AuthResult, val web: Boolean) : RefreshOutcome
         data object Reused : RefreshOutcome
     }
 

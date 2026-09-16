@@ -32,7 +32,7 @@ Sadržaj:
 |---|---|---|
 | Security scheme | `cookieAuth` (`vc_session` kolačić: HttpOnly, Secure, SameSite=Lax) | `bearerAuth` (`Authorization: Bearer <opaque access token>`) |
 | Gde žive tokeni | samo u HttpOnly kolačićima, **nikad** u `localStorage` | Keychain / Keystore; nikad u preferences ni u logovima |
-| Refresh | `POST /auth/refresh` bez tela (refresh kolačić) | `POST /auth/refresh` sa `refreshToken` u telu, single-flight |
+| Refresh | `POST /auth/refresh` bez tela (HttpOnly `vc_refresh` kolačić) | `POST /auth/refresh` sa `refreshToken` u telu, single-flight |
 | CSRF | obavezan `X-CSRF-Token` + tačna provera `Origin` na svakom mutirajućem zahtevu | nije primenljivo |
 | MFA | TOTP obavezan za OWNER, SUPER_ADMIN, SUPPORT | isto |
 

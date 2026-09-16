@@ -200,7 +200,8 @@ class SessionResolverIntegrationTest {
         val cookies = login.headers.getAll(HttpHeaders.SetCookie).orEmpty()
         val accessCookie = cookies.first { it.startsWith("vc_access=") }
         assertTrue(accessCookie.contains("HttpOnly"))
-        assertTrue(cookies.any { it.startsWith("vc_refresh=") && it.contains("HttpOnly") })
+        val refreshCookie = cookies.first { it.startsWith("vc_refresh=") }
+        assertTrue(refreshCookie.contains("HttpOnly"))
         assertFalse(login.bodyAsText().contains("vca_"))
 
         val current = client.get("/api/v1/auth/session") {
@@ -208,6 +209,21 @@ class SessionResolverIntegrationTest {
         }
         assertEquals(HttpStatusCode.OK, current.status)
         assertTrue(current.bodyAsText().contains(email))
+
+        val refreshed = client.post("/api/v1/auth/refresh") {
+            header(HttpHeaders.Cookie, refreshCookie.substringBefore(';'))
+        }
+        assertEquals(HttpStatusCode.OK, refreshed.status)
+        val refreshedCookies = refreshed.headers.getAll(HttpHeaders.SetCookie).orEmpty()
+        val refreshedAccessCookie = refreshedCookies.first { it.startsWith("vc_access=") }
+        assertTrue(refreshedCookies.any { it.startsWith("vc_refresh=") && it.contains("HttpOnly") })
+        assertFalse(refreshed.bodyAsText().contains("vca_"))
+
+        val refreshedSession = client.get("/api/v1/auth/session") {
+            header(HttpHeaders.Cookie, refreshedAccessCookie.substringBefore(';'))
+        }
+        assertEquals(HttpStatusCode.OK, refreshedSession.status)
+        assertTrue(refreshedSession.bodyAsText().contains(email))
     }
 
     private suspend fun io.ktor.server.testing.ApplicationTestBuilder.requestWith(token: String) =
