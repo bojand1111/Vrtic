@@ -6,7 +6,6 @@ import com.vrticconnect.http.ProblemException
 import io.ktor.http.HttpHeaders
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receive
-import io.ktor.server.request.receiveOrNull
 import io.ktor.server.response.respond
 import kotlinx.serialization.Serializable
 import java.sql.Connection
@@ -115,7 +114,7 @@ class LoginService(
     }
 
     suspend fun refresh(call: ApplicationCall) {
-        val request = call.receiveOrNull<RefreshRequest>()
+        val request = runCatching { call.receive<RefreshRequest>() }.getOrNull()
         val refreshToken = (request?.refreshToken ?: call.request.cookies["vc_refresh"])?.trim()
             ?.takeIf { Tokens.isRefreshToken(it) }
             ?: throw ProblemException.invalidCredentials()
