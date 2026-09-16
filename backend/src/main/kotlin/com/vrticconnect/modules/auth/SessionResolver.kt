@@ -43,7 +43,7 @@ fun interface SessionResolver {
  */
 class DatabaseSessionResolver(private val database: Database) : SessionResolver {
     override suspend fun resolve(call: ApplicationCall): AuthenticatedUser? {
-        val token = call.bearerToken()
+        val token = (call.bearerToken() ?: call.request.cookies["vc_access"])
             ?.takeIf { Tokens.isAccessToken(it) }
             ?: return null
 

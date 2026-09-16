@@ -3,6 +3,7 @@ package com.vrticconnect
 import com.vrticconnect.config.AppConfig
 import com.vrticconnect.db.Database
 import com.vrticconnect.db.DbContext
+import com.vrticconnect.modules.auth.Argon2idPasswordHasher
 import com.vrticconnect.modules.auth.DatabaseSessionResolver
 import com.vrticconnect.modules.auth.Tokens
 import com.vrticconnect.modules.health.AlwaysUpProbe
@@ -10,8 +11,13 @@ import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import io.ktor.client.request.header
 import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assumptions.assumeTrue
@@ -21,6 +27,7 @@ import org.junit.jupiter.api.TestInstance
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /** Native PostgreSQL proof for E02-B01. Skipped unless VRTIC_TEST_DB=1 is explicitly enabled. */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -40,6 +47,7 @@ class SessionResolverIntegrationTest {
     private val expiredToken = Tokens.generate(Tokens.Kind.ACCESS)
     private val revokedToken = Tokens.generate(Tokens.Kind.ACCESS)
     private val revokedSessionToken = Tokens.generate(Tokens.Kind.ACCESS)
+    private val testPassword = "correct horse battery staple"
     private val email = "session-test-${userId}@example.test"
 
     @BeforeAll
@@ -51,14 +59,21 @@ class SessionResolverIntegrationTest {
         ownerDb = Database(ownerPool)
 
         runtimeDb.transactionBlocking(DbContext.Auth()) { connection ->
+            val passwordChars = testPassword.toCharArray()
+            val passwordHash = try {
+                Argon2idPasswordHasher(config.argon2).hash(passwordChars)
+            } finally {
+                passwordChars.fill('\u0000')
+            }
             connection.prepareStatement(
-                "INSERT INTO app.users (id, email, email_verified_at, given_name, family_name) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO app.users (id, email, password_hash, email_verified_at, given_name, family_name) VALUES (?, ?, ?, ?, ?, ?)",
             ).use { statement ->
                 statement.setObject(1, userId)
                 statement.setString(2, email)
-                statement.setObject(3, java.sql.Timestamp.from(Instant.now()))
-                statement.setString(4, "Session")
-                statement.setString(5, "Test")
+                statement.setString(3, passwordHash)
+                statement.setObject(4, java.sql.Timestamp.from(Instant.now()))
+                statement.setString(5, "Session")
+                statement.setString(6, "Test")
                 statement.executeUpdate()
             }
             insertSession(connection, validSessionId, null)
@@ -101,6 +116,30 @@ class SessionResolverIntegrationTest {
         assertEquals(HttpStatusCode.Unauthorized, requestWith(expiredToken).status)
         assertEquals(HttpStatusCode.Unauthorized, requestWith(revokedToken).status)
         assertEquals(HttpStatusCode.Unauthorized, requestWith(revokedSessionToken).status)
+    }
+
+    @Test
+    fun `login issues opaque bearer tokens for a verified user`() = testApplication {
+        application {
+            module(
+                AppDependencies(
+                    config = config,
+                    database = runtimeDb,
+                    readiness = AlwaysUpProbe,
+                    sessionResolver = DatabaseSessionResolver(runtimeDb),
+                ),
+            )
+        }
+
+        val response = client.post("/api/v1/auth/login") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"email":"$email","password":"$testPassword","clientKind":"ANDROID"}""")
+        }
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = response.bodyAsText()
+        assertTrue(body.contains("\"status\":\"AUTHENTICATED\""))
+        assertTrue(body.contains("\"accessToken\":\"vca_"))
+        assertTrue(body.contains("\"refreshToken\":\"vcr_"))
     }
 
     private suspend fun io.ktor.server.testing.ApplicationTestBuilder.requestWith(token: String) =

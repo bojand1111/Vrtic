@@ -12,8 +12,8 @@ export interface SessionResponse {
 }
 
 /**
- * POST /api/v1/auth/login. On success the backend sets HttpOnly session cookies;
- * the SPA stores nothing. The backend skeleton currently answers 501 (problem+json).
+ * POST /api/v1/auth/login. Bearer login is implemented for mobile clients; web cookie
+ * delivery remains a later EPIC 02 task, so the SPA still stores no tokens locally.
  */
 export function login(request: LoginRequest): Promise<void> {
   return apiFetch<undefined>('/api/v1/auth/login', {

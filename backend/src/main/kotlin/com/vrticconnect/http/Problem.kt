@@ -61,6 +61,14 @@ class ProblemException(
             headers = mapOf("WWW-Authenticate" to "Bearer realm=\"vrtic\""),
         )
 
+        fun invalidCredentials() = ProblemException(
+            status = HttpStatusCode.Unauthorized,
+            type = ProblemTypes.UNAUTHENTICATED,
+            title = "Invalid credentials",
+            detail = "INVALID_CREDENTIALS",
+            headers = mapOf("WWW-Authenticate" to "Bearer realm=\"vrtic\""),
+        )
+
         /** Used for both "no permission" and "resource belongs to another tenant" — never reveals existence. */
         fun notFound() = ProblemException(
             status = HttpStatusCode.NotFound,

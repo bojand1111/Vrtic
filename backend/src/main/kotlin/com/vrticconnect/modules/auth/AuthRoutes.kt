@@ -8,11 +8,10 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 
 /**
- * Authentication endpoints are DESIGNED (docs/API.md, docs/openapi.yaml) but NOT implemented.
- * Every route is deliberately closed with 501 + problem+json. No tokens are ever issued here.
- * Implementation is EPIC 02 (docs/DEVELOPMENT_ROADMAP.md). Do NOT add development shortcuts.
+ * Authentication endpoints are implemented incrementally. Login is available when the real
+ * database dependencies are wired; remaining endpoints stay explicitly closed until implemented.
  */
-fun Route.authRoutes(sessionResolver: SessionResolver) {
+fun Route.authRoutes(sessionResolver: SessionResolver, loginService: LoginService? = null) {
     route("/auth") {
         // Current session is still a 501 stub after credentials are resolved.
         get("/session") {
@@ -20,7 +19,7 @@ fun Route.authRoutes(sessionResolver: SessionResolver) {
             throw ProblemException.notImplemented("Session info")
         }
         post("/register") { throw ProblemException.notImplemented("Registration") }
-        post("/login") { throw ProblemException.notImplemented("Login") }
+        post("/login") { loginService?.login(call) ?: throw ProblemException.notImplemented("Login") }
         post("/refresh") { throw ProblemException.notImplemented("Token refresh") }
         post("/logout") { throw ProblemException.notImplemented("Logout") }
         post("/logout-all") { throw ProblemException.notImplemented("Logout from all devices") }

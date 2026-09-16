@@ -273,8 +273,8 @@ paths:
       description: >-
         Verifies credentials (Argon2id) and creates a session for the device. Web clients receive HttpOnly cookies + `csrfToken`; mobile
         clients receive `tokens`. Accounts with MFA get `status: MFA_REQUIRED` and a `mfaChallengeToken`. Failed attempts are counted per
-        e-mail hash and IP; generic `401 INVALID_CREDENTIALS` is returned whether the account exists or not. **Current skeleton: returns
-        `501` and intentionally issues no tokens.**
+        e-mail hash and IP; generic `401 INVALID_CREDENTIALS` is returned whether the account exists or not. The current implementation covers
+        verified-user Bearer login and opaque token issuance; cookie delivery, MFA and rate limiting are subsequent EPIC 02 tasks.
       security: []
       requestBody:
         required: true
@@ -310,7 +310,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: implemented-stub
+      x-status: implemented-partial
       x-roles: []
   /auth/refresh:
     post:

@@ -2,7 +2,7 @@
 
 > **Status:** projektni dokument. Mašinski čitljiv izvor istine je `docs/openapi.yaml` (OpenAPI 3.1, 167 operacija). Ovaj dokument je njegov pregled na srpskom; identifikatori (path-ovi, polja, kodovi, `operationId`) su na engleskom i moraju se poklapati sa YAML-om. Nazivi polja prate kolone iz `docs/database/schema.sql` u camelCase obliku.
 >
-> U trenutnom skeleton-u postoje samo `GET /health/live`, `GET /health/ready` i stubovi `POST /auth/login`, `POST /auth/refresh` i `GET /auth/session` koji vraćaju `501 Not Implemented` (`GET /auth/session` vraća `401` kad nema sesije). Sve ostalo je **projektovano, a nije implementirano** (v. poslednji odeljak).
+> U trenutnom skeleton-u postoje `GET /health/live`, `GET /health/ready` i delimično implementiran Bearer `POST /auth/login`; `POST /auth/refresh` i `GET /auth/session` su i dalje stubovi (`GET /auth/session` vraća `401` kad nema sesije). Sve ostalo je **projektovano, a nije implementirano** (v. poslednji odeljak).
 
 Sadržaj:
 
@@ -745,7 +745,7 @@ Bez `purpose` → `422`; vaspitač bez `CHILD_HEALTH_READ` (ili OWNER bez nje) �
 | Stavka | Stanje |
 |---|---|
 | `GET /health/live`, `GET /health/ready` | **implementirano** u skeleton-u (Ktor bootstrap; readiness proverava bazu i migracije) |
-| `POST /auth/login`, `POST /auth/refresh`, `GET /auth/session` | **implementirano kao stub** – rute postoje, vraćaju `501 Not Implemented` sa `Problem` telom (`GET /auth/session` vraća `401` bez sesije) i namerno **ne izdaju tokene**; ne zamenjivati lažnom prijavom ni prečicom koja zaobilazi dozvole |
+| `POST /auth/login`, `POST /auth/refresh`, `GET /auth/session` | **delimično implementirano** – login za verifikovanog Bearer klijenta proverava Argon2id i izdaje opaque tokene; refresh i session bootstrap su još stubovi; ne zamenjivati lažnom prijavom ni prečicom koja zaobilazi dozvole |
 | Sve ostale operacije ({{DESIGNED}} od 167) | **samo projektovane** – postoje u `docs/openapi.yaml` sa `x-status: designed`; nema koda, nema ruta, nema testova |
 
 Konkretno, nije implementirano ništa od: registracije preko pozivnice, verifikacije e-maila, reset lozinke, sesija i opoziva, MFA, push tokena; `/me`; `/platform/*`; tenant konteksta i RLS runtime-a; objekata, grupa, zaposlenih, pozivnica, dozvola, dodela; dece, upisa, staratelja, ovlašćenih osoba, zdravstvenih profila; rasporeda (šabloni, izmene, neradni dani, preview, zamrzavanje planova); odsustava; prisustva (komande, projekcija, dnevni pregled, offline sync); obaveštenja i notifikacija (outbox, FCM/APNs); kalendara; jelovnika; fajlova i fotografija (upload, karantin, skeniranje, signed URL); saglasnosti; poruka; audit loga; izveštaja; zahteva za privatnost; dashboard-a.

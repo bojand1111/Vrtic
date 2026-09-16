@@ -2,7 +2,9 @@ package com.vrticconnect
 
 import com.vrticconnect.config.AppConfig
 import com.vrticconnect.db.Database
+import com.vrticconnect.modules.auth.Argon2idPasswordHasher
 import com.vrticconnect.modules.auth.DatabaseSessionResolver
+import com.vrticconnect.modules.auth.LoginService
 import com.vrticconnect.modules.auth.NotImplementedSessionResolver
 import com.vrticconnect.modules.auth.SessionResolver
 import com.vrticconnect.modules.auth.authRoutes
@@ -28,6 +30,8 @@ class AppDependencies(
     val readiness: ReadinessProbe,
     /** Resolves an access token into an authenticated principal. */
     val sessionResolver: SessionResolver = database?.let(::DatabaseSessionResolver) ?: NotImplementedSessionResolver,
+    /** Issues sessions after validating credentials; omitted by DB-free route tests. */
+    val loginService: LoginService? = database?.let { LoginService(it, Argon2idPasswordHasher(config.argon2)) },
 )
 
 fun Application.module(deps: AppDependencies) {
@@ -40,7 +44,7 @@ fun Application.module(deps: AppDependencies) {
     routing {
         healthRoutes(deps.readiness)
         route("/api/v1") {
-            authRoutes(deps.sessionResolver)
+            authRoutes(deps.sessionResolver, deps.loginService)
             tenantRoutes(deps.sessionResolver)
         }
     }
