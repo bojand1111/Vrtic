@@ -55,6 +55,7 @@ class LoginService(
     private val database: Database,
     private val passwordHasher: PasswordHasher,
     private val devMode: Boolean,
+    private val csrfService: CsrfService? = null,
 ) {
     suspend fun login(call: ApplicationCall) {
         val request = call.receive<LoginRequest>()
@@ -85,8 +86,9 @@ class LoginService(
                 val sessionId = UUID.randomUUID()
                 val accessToken = Tokens.generate(Tokens.Kind.ACCESS)
                 val refreshToken = Tokens.generate(Tokens.Kind.REFRESH)
+                val csrfToken = if (clientKind == "WEB") Tokens.generate(Tokens.Kind.CSRF) else null
 
-                insertSession(connection, sessionId, user.id, clientKind, request.device, absoluteExpires)
+                insertSession(connection, sessionId, user.id, clientKind, request.device, absoluteExpires, csrfToken)
                 insertAccessToken(connection, sessionId, accessToken, now, accessExpires)
                 insertRefreshToken(connection, sessionId, refreshToken, now, refreshExpires)
 
@@ -99,12 +101,14 @@ class LoginService(
                         refreshToken = refreshToken,
                         refreshTokenExpiresAt = refreshExpires.toString(),
                     ),
+                    csrfToken = csrfToken,
                 )
             }
             if (clientKind == "WEB" && result.tokens != null) {
                 appendTokenCookie(call, "vc_access", result.tokens.accessToken, 600, "/api")
                 appendTokenCookie(call, "vc_refresh", result.tokens.refreshToken, 604_800, "/api/v1/auth/refresh")
-                call.respond(result.copy(tokens = null))
+                result.csrfToken?.let { appendCookie(call, "vc_csrf", it, 604_800, "/", httpOnly = false) }
+                call.respond(result.copy(tokens = null, csrfToken = null))
             } else {
                 call.respond(result)
             }
@@ -118,6 +122,7 @@ class LoginService(
         val refreshToken = (request?.refreshToken ?: call.request.cookies["vc_refresh"])?.trim()
             ?.takeIf { Tokens.isRefreshToken(it) }
             ?: throw ProblemException.invalidCredentials()
+        csrfService?.requireRefresh(call, refreshToken)
 
         val result = database.transaction(DbContext.Auth()) { connection ->
             val current = findRefreshToken(connection, refreshToken)
@@ -185,6 +190,35 @@ class LoginService(
         }
     }
 
+    suspend fun logout(call: ApplicationCall, authenticated: AuthenticatedUser) {
+        database.transaction(DbContext.Auth(authenticated.userId)) { connection ->
+            connection.prepareStatement(
+                "UPDATE app.sessions SET revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP), revoke_reason = 'USER_LOGOUT' " +
+                    "WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
+            ).use { statement ->
+                statement.setObject(1, authenticated.sessionId)
+                statement.setObject(2, authenticated.userId)
+                statement.executeUpdate()
+            }
+            connection.prepareStatement(
+                "UPDATE app.access_tokens SET revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP) WHERE session_id = ? AND revoked_at IS NULL",
+            ).use { statement ->
+                statement.setObject(1, authenticated.sessionId)
+                statement.executeUpdate()
+            }
+            connection.prepareStatement(
+                "UPDATE app.refresh_tokens SET consumed_at = COALESCE(consumed_at, CURRENT_TIMESTAMP) WHERE session_id = ? AND consumed_at IS NULL",
+            ).use { statement ->
+                statement.setObject(1, authenticated.sessionId)
+                statement.executeUpdate()
+            }
+        }
+        clearCookie(call, "vc_access", "/api", httpOnly = true)
+        clearCookie(call, "vc_refresh", "/api/v1/auth/refresh", httpOnly = true)
+        clearCookie(call, "vc_csrf", "/", httpOnly = false)
+        call.respond(io.ktor.http.HttpStatusCode.NoContent)
+    }
+
     private fun findUser(connection: Connection, email: String): LoginUser? =
         connection.prepareStatement(
             "SELECT id, password_hash, status, email_verified_at, locked_until FROM app.users WHERE email = ?",
@@ -209,10 +243,11 @@ class LoginService(
         clientKind: String,
         device: LoginDevice?,
         absoluteExpires: Instant,
+        csrfToken: String?,
     ) {
         connection.prepareStatement(
-            "INSERT INTO app.sessions (id, user_id, client_kind, device_name, device_id, user_agent, absolute_expires_at) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO app.sessions (id, user_id, client_kind, device_name, device_id, user_agent, absolute_expires_at, csrf_token_hash) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         ).use { statement ->
             statement.setObject(1, sessionId)
             statement.setObject(2, userId)
@@ -221,6 +256,7 @@ class LoginService(
             statement.setString(5, device?.deviceId)
             statement.setString(6, null)
             statement.setTimestamp(7, Timestamp.from(absoluteExpires))
+            statement.setBytes(8, csrfToken?.let(Tokens::sha256))
             statement.executeUpdate()
         }
     }
@@ -308,11 +344,20 @@ class LoginService(
     }
 
     private fun appendTokenCookie(call: ApplicationCall, name: String, value: String, maxAgeSeconds: Int, path: String) {
+        appendCookie(call, name, value, maxAgeSeconds, path, httpOnly = true)
+    }
+
+    private fun appendCookie(call: ApplicationCall, name: String, value: String, maxAgeSeconds: Int, path: String, httpOnly: Boolean) {
         val secure = if (devMode) "" else "; Secure"
+        val httpOnlyAttribute = if (httpOnly) "; HttpOnly" else ""
         call.response.headers.append(
             HttpHeaders.SetCookie,
-            "$name=$value; Max-Age=$maxAgeSeconds; Path=$path; HttpOnly; SameSite=Lax$secure",
+            "$name=$value; Max-Age=$maxAgeSeconds; Path=$path$httpOnlyAttribute; SameSite=Lax$secure",
         )
+    }
+
+    private fun clearCookie(call: ApplicationCall, name: String, path: String, httpOnly: Boolean) {
+        appendCookie(call, name, "", 0, path, httpOnly)
     }
 
     private data class LoginUser(

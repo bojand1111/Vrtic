@@ -14,7 +14,7 @@ object Tokens {
     private val random = SecureRandom()
     private val encoder = Base64.getUrlEncoder().withoutPadding()
 
-    enum class Kind(val prefix: String) { ACCESS("vca_"), REFRESH("vcr_"), RESET("vcp_"), VERIFY("vce_"), INVITE("vci_") }
+    enum class Kind(val prefix: String) { ACCESS("vca_"), REFRESH("vcr_"), CSRF("vcc_"), RESET("vcp_"), VERIFY("vce_"), INVITE("vci_") }
 
     fun generate(kind: Kind): String {
         val bytes = ByteArray(32).also(random::nextBytes)
@@ -30,6 +30,11 @@ object Tokens {
         token.length == Kind.REFRESH.prefix.length + 43 &&
             token.startsWith(Kind.REFRESH.prefix) &&
             token.drop(Kind.REFRESH.prefix.length).all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '-' || it == '_' }
+
+    fun isCsrfToken(token: String): Boolean =
+        token.length == Kind.CSRF.prefix.length + 43 &&
+            token.startsWith(Kind.CSRF.prefix) &&
+            token.drop(Kind.CSRF.prefix.length).all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '-' || it == '_' }
 
     fun sha256(token: String): ByteArray =
         MessageDigest.getInstance("SHA-256").digest(token.toByteArray(Charsets.US_ASCII))

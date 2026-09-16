@@ -2,7 +2,7 @@
 
 SaaS platforma za privatne vrtiće: mobilna aplikacija za roditelje i vaspitače (Kotlin Multiplatform + Compose), web administracija (React + Vite) i jedan Ktor backend nad PostgreSQL-om sa Row Level Security izolacijom po vrtiću.
 
-> **Stanje:** foundation skeleton (EPIC 01) plus EPIC 02 Bearer login, refresh rotacija i session bootstrap: izdaju se opaque access/refresh tokeni, web dobija HttpOnly kolačiće, resolver proverava validnost i opoziv, a reuse refresh tokena opoziva sesiju. CSRF mutacije i poslovni moduli još nisu implementirani. Šta je stvarno provereno piše u [docs/VALIDATION_REPORT.md](docs/VALIDATION_REPORT.md). Sledeći korak je nastavak [EPIC 02](docs/DEVELOPMENT_ROADMAP.md).
+> **Stanje:** foundation skeleton (EPIC 01) plus EPIC 02 Bearer login, refresh rotacija, session bootstrap, web CSRF provera i logout tekuće sesije: izdaju se opaque access/refresh tokeni, web dobija HttpOnly kolačiće + session-bound `vc_csrf`, resolver proverava validnost i opoziv, a reuse refresh tokena opoziva sesiju. Poslovni moduli i ostatak EPIC 02 još nisu implementirani. Šta je stvarno provereno piše u [docs/VALIDATION_REPORT.md](docs/VALIDATION_REPORT.md). Sledeći korak je nastavak [EPIC 02](docs/DEVELOPMENT_ROADMAP.md).
 
 ## Dokumentacija
 
@@ -52,7 +52,7 @@ java -jar build/libs/vrtic-backend-all.jar migrate
 java -jar build/libs/vrtic-backend-all.jar serve      # http://localhost:8080
 ```
 
-Provera: `GET /health/live`, `GET /health/ready` (proverava bazu i migracije), DB-backed `POST /api/v1/auth/login` → Bearer tokene za mobilne klijente ili HttpOnly kolačiće za web, `POST /api/v1/auth/refresh` → rotiran par tokena, `GET /api/v1/auth/session` → trenutni korisnik i članstva, `GET /api/v1/organizations/{id}/ping` → `401` bez sesije.
+Provera: `GET /health/live`, `GET /health/ready` (proverava bazu i migracije), DB-backed `POST /api/v1/auth/login` → Bearer tokene za mobilne klijente ili HttpOnly kolačiće + `vc_csrf` za web, `POST /api/v1/auth/refresh` → rotiran par tokena uz CSRF za cookie režim, `GET /api/v1/auth/session` → trenutni korisnik i članstva, `POST /api/v1/auth/logout` → opoziv tekuće sesije, `GET /api/v1/organizations/{id}/ping` → `401` bez sesije.
 
 Seed (sintetički podaci; odbija bazu koja nije označena kao `dev`):
 

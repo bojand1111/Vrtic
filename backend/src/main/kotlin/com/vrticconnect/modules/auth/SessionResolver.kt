@@ -27,8 +27,8 @@ data class MembershipContext(
 
 /**
  * Resolves credentials carried by the request into an [AuthenticatedUser].
- * Opaque access tokens can arrive as Bearer credentials or the web access cookie; CSRF/Origin
- * verification for mutating cookie requests is a subsequent task.
+ * Opaque access tokens can arrive as Bearer credentials or the web access cookie. Mutating
+ * cookie-backed routes apply CSRF/Origin verification before changing state.
  */
 fun interface SessionResolver {
     suspend fun resolve(call: ApplicationCall): AuthenticatedUser?

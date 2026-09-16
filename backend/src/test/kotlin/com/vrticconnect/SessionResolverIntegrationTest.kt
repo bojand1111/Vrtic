@@ -81,7 +81,7 @@ class SessionResolverIntegrationTest {
             }
             insertSession(connection, validSessionId, null)
             insertSession(connection, revokedSessionId, "now()")
-            insertSession(connection, refreshSessionId, null)
+            insertSession(connection, refreshSessionId, null, "ANDROID")
             insertToken(connection, validSessionId, validToken, "now() + interval '10 minutes'", null)
             insertToken(connection, validSessionId, expiredToken, "now() - interval '1 minute'", null)
             insertToken(connection, validSessionId, revokedToken, "now() + interval '10 minutes'", "now()")
@@ -202,6 +202,9 @@ class SessionResolverIntegrationTest {
         assertTrue(accessCookie.contains("HttpOnly"))
         val refreshCookie = cookies.first { it.startsWith("vc_refresh=") }
         assertTrue(refreshCookie.contains("HttpOnly"))
+        val csrfCookie = cookies.first { it.startsWith("vc_csrf=") }
+        assertFalse(csrfCookie.contains("HttpOnly"))
+        val csrfToken = csrfCookie.substringBefore(';').substringAfter('=')
         assertFalse(login.bodyAsText().contains("vca_"))
 
         val current = client.get("/api/v1/auth/session") {
@@ -211,7 +214,9 @@ class SessionResolverIntegrationTest {
         assertTrue(current.bodyAsText().contains(email))
 
         val refreshed = client.post("/api/v1/auth/refresh") {
-            header(HttpHeaders.Cookie, refreshCookie.substringBefore(';'))
+            header(HttpHeaders.Cookie, "${refreshCookie.substringBefore(';')}; ${csrfCookie.substringBefore(';')}")
+            header(HttpHeaders.Origin, config.webOrigin)
+            header("X-CSRF-Token", csrfToken)
         }
         assertEquals(HttpStatusCode.OK, refreshed.status)
         val refreshedCookies = refreshed.headers.getAll(HttpHeaders.SetCookie).orEmpty()
@@ -224,6 +229,50 @@ class SessionResolverIntegrationTest {
         }
         assertEquals(HttpStatusCode.OK, refreshedSession.status)
         assertTrue(refreshedSession.bodyAsText().contains(email))
+    }
+
+    @Test
+    fun `web logout requires csrf and revokes the current session`() = testApplication {
+        application {
+            module(
+                AppDependencies(
+                    config = config,
+                    database = runtimeDb,
+                    readiness = AlwaysUpProbe,
+                    sessionResolver = DatabaseSessionResolver(runtimeDb),
+                ),
+            )
+        }
+
+        val login = client.post("/api/v1/auth/login") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"email":"$email","password":"$testPassword","clientKind":"WEB"}""")
+        }
+        val cookies = login.headers.getAll(HttpHeaders.SetCookie).orEmpty()
+        val accessCookie = cookies.first { it.startsWith("vc_access=") }.substringBefore(';')
+        val csrfCookie = cookies.first { it.startsWith("vc_csrf=") }.substringBefore(';')
+        val csrfToken = csrfCookie.substringAfter('=')
+        val cookieHeader = "$accessCookie; $csrfCookie"
+
+        val denied = client.post("/api/v1/auth/logout") {
+            header(HttpHeaders.Cookie, cookieHeader)
+            header(HttpHeaders.Origin, config.webOrigin)
+        }
+        assertEquals(HttpStatusCode.Forbidden, denied.status)
+        assertEquals(HttpStatusCode.OK, client.get("/api/v1/auth/session") {
+            header(HttpHeaders.Cookie, accessCookie)
+        }.status)
+
+        val logout = client.post("/api/v1/auth/logout") {
+            header(HttpHeaders.Cookie, cookieHeader)
+            header(HttpHeaders.Origin, config.webOrigin)
+            header("X-CSRF-Token", csrfToken)
+        }
+        assertEquals(HttpStatusCode.NoContent, logout.status)
+        assertTrue(logout.headers.getAll(HttpHeaders.SetCookie).orEmpty().all { it.contains("Max-Age=0") })
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/v1/auth/session") {
+            header(HttpHeaders.Cookie, accessCookie)
+        }.status)
     }
 
     private suspend fun io.ktor.server.testing.ApplicationTestBuilder.requestWith(token: String) =
@@ -241,14 +290,15 @@ class SessionResolverIntegrationTest {
         },
     )
 
-    private fun insertSession(connection: java.sql.Connection, sessionId: UUID, revokedAt: String?) {
+    private fun insertSession(connection: java.sql.Connection, sessionId: UUID, revokedAt: String?, clientKind: String = "WEB") {
         val revokedExpression = revokedAt ?: "NULL"
         connection.prepareStatement(
             "INSERT INTO app.sessions (id, user_id, client_kind, absolute_expires_at, revoked_at) " +
-                "VALUES (?, ?, 'WEB', now() + interval '1 hour', $revokedExpression)",
+                "VALUES (?, ?, ?, now() + interval '1 hour', $revokedExpression)",
         ).use { statement ->
             statement.setObject(1, sessionId)
             statement.setObject(2, userId)
+            statement.setString(3, clientKind)
             statement.executeUpdate()
         }
     }

@@ -1,7 +1,7 @@
 /**
- * CSRF hook (placeholder until the backend defines the exact scheme).
+ * CSRF hook for the backend's web double-submit scheme.
  *
- * Planned scheme (REQUIREMENTS_BRIEF section 7): HttpOnly session cookies + CSRF token + exact Origin check.
+ * The backend uses HttpOnly session cookies + a session-bound CSRF token + exact Origin check.
  * The token is expected in a readable (non-HttpOnly) cookie and echoed back in the
  * `X-CSRF-Token` header on every state-changing request (double-submit pattern).
  * If the backend ends up delivering the token differently (e.g. in the session response),

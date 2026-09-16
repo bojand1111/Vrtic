@@ -15,6 +15,7 @@ fun Route.authRoutes(
     sessionResolver: SessionResolver,
     loginService: LoginService? = null,
     sessionService: SessionService? = null,
+    csrfService: CsrfService? = null,
 ) {
     route("/auth") {
         // DB-backed deployments return the minimal SPA bootstrap payload; DB-free route tests keep the stub.
@@ -27,7 +28,14 @@ fun Route.authRoutes(
         post("/register") { throw ProblemException.notImplemented("Registration") }
         post("/login") { loginService?.login(call) ?: throw ProblemException.notImplemented("Login") }
         post("/refresh") { loginService?.refresh(call) ?: throw ProblemException.notImplemented("Token refresh") }
-        post("/logout") { throw ProblemException.notImplemented("Logout") }
+        post("/logout") {
+            if (loginService == null) {
+                throw ProblemException.notImplemented("Logout")
+            }
+            val authenticated = requireUser(sessionResolver)
+            csrfService?.require(call, authenticated)
+            loginService.logout(call, authenticated)
+        }
         post("/logout-all") { throw ProblemException.notImplemented("Logout from all devices") }
         get("/sessions") { throw ProblemException.notImplemented("Session list") }
         delete("/sessions/{sessionId}") { throw ProblemException.notImplemented("Session revocation") }

@@ -14,7 +14,7 @@ info:
     platform operator).
 
 
-    **Status.** `GET /health/live`, `GET /health/ready`, `POST /auth/login`, `POST /auth/refresh` and `GET /auth/session` have a
+    **Status.** `GET /health/live`, `GET /health/ready`, `POST /auth/login`, `POST /auth/refresh`, `GET /auth/session` and `POST /auth/logout` have a
     DB-backed partial implementation. Every other operation is marked `x-status: designed` and is NOT implemented.
 
 
@@ -271,10 +271,11 @@ paths:
         - Auth
       summary: Login with e-mail and password
       description: >-
-        Verifies credentials (Argon2id) and creates a session for the device. Web clients receive HttpOnly cookies + `csrfToken`; mobile
-        clients receive `tokens`. Accounts with MFA get `status: MFA_REQUIRED` and a `mfaChallengeToken`. Failed attempts are counted per
-        e-mail hash and IP; generic `401 INVALID_CREDENTIALS` is returned whether the account exists or not. The current implementation covers
-        verified-user Argon2id login, opaque token issuance and web HttpOnly cookie delivery; MFA, rate limiting and CSRF are subsequent tasks.
+        Verifies credentials (Argon2id) and creates a session for the device. Web clients receive HttpOnly access/refresh cookies plus a
+        readable session-bound `vc_csrf` cookie; mobile clients receive `tokens`. Accounts with MFA get `status: MFA_REQUIRED` and a
+        `mfaChallengeToken`. Failed attempts are counted per e-mail hash and IP; generic `401 INVALID_CREDENTIALS` is returned whether the
+        account exists or not. The current implementation covers verified-user Argon2id login, opaque token issuance and cookie delivery;
+        MFA and rate limiting are subsequent tasks.
       security: []
       requestBody:
         required: true
@@ -321,7 +322,8 @@ paths:
       description: >-
         Atomically consumes the presented Bearer refresh token and issues a new access/refresh pair. Reuse of an already consumed token revokes
         the whole session family and returns `401 REFRESH_REUSE_DETECTED`. Idle expiry 7 days, absolute 30 days. Web clients may present the
-        `vc_refresh` HttpOnly cookie without a request body and receive rotated HttpOnly `vc_access` and `vc_refresh` cookies.
+        `vc_refresh` HttpOnly cookie without a request body and receive rotated HttpOnly `vc_access` and `vc_refresh` cookies; cookie mode
+        also requires the session-bound `X-CSRF-Token` and exact configured `Origin`.
       security: []
       requestBody:
         required: false
@@ -362,7 +364,7 @@ paths:
       description: >-
         Returns the current session summary (user, session, client kind, MFA state, CSRF token in cookie mode, membership summary) so the
         web admin can restore its state after a page load without a second round-trip. `401` (Problem) when there is no valid session. The current
-        implementation returns the authenticated user and active membership summary; CSRF token delivery is a subsequent task.
+        implementation returns the authenticated user and active membership summary; the CSRF token is delivered in the readable `vc_csrf` cookie.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -405,8 +407,8 @@ paths:
         - Auth
       summary: Logout current session
       description: >-
-        Revokes the current session (`USER_LOGOUT`), its access and refresh tokens and the push tokens registered by it; clears cookies.
-        Idempotent.
+        Revokes the current session (`USER_LOGOUT`), its access and refresh tokens and clears web cookies. Cookie mode requires the
+        session-bound `X-CSRF-Token` and exact configured `Origin`; bearer mode does not.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -436,7 +438,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented-partial
       x-roles:
         - OWNER
         - ADMIN

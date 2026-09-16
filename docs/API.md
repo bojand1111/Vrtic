@@ -2,7 +2,7 @@
 
 > **Status:** projektni dokument. Mašinski čitljiv izvor istine je `docs/openapi.yaml` (OpenAPI 3.1, 167 operacija). Ovaj dokument je njegov pregled na srpskom; identifikatori (path-ovi, polja, kodovi, `operationId`) su na engleskom i moraju se poklapati sa YAML-om. Nazivi polja prate kolone iz `docs/database/schema.sql` u camelCase obliku.
 >
-> U trenutnom skeleton-u postoje `GET /health/live`, `GET /health/ready` i delimično implementirani `POST /auth/login`, `POST /auth/refresh` i `GET /auth/session`; bez važeće sesije session endpoint vraća `401`. Sve ostalo je **projektovano, a nije implementirano** (v. poslednji odeljak).
+> U trenutnom skeleton-u postoje `GET /health/live`, `GET /health/ready` i delimično implementirani `POST /auth/login`, `POST /auth/refresh`, `GET /auth/session` i `POST /auth/logout`; bez važeće sesije session endpoint vraća `401`. Sve ostalo je **projektovano, a nije implementirano** (v. poslednji odeljak).
 
 Sadržaj:
 
@@ -30,7 +30,7 @@ Sadržaj:
 
 | | Web admin (React SPA) | Mobile (KMP) |
 |---|---|---|
-| Security scheme | `cookieAuth` (`vc_access` kolačić: HttpOnly, Secure, SameSite=Lax; `vc_refresh` samo za refresh putanju) | `bearerAuth` (`Authorization: Bearer <opaque access token>`) |
+| Security scheme | `cookieAuth` (`vc_access` i `vc_refresh`: HttpOnly, Secure, SameSite=Lax; `vc_csrf`: čitljiv, vezan za sesiju) | `bearerAuth` (`Authorization: Bearer <opaque access token>`) |
 | Gde žive tokeni | samo u HttpOnly kolačićima, **nikad** u `localStorage` | Keychain / Keystore; nikad u preferences ni u logovima |
 | Refresh | `POST /auth/refresh` bez tela (HttpOnly `vc_refresh` kolačić) | `POST /auth/refresh` sa `refreshToken` u telu, single-flight |
 | CSRF | obavezan `X-CSRF-Token` + tačna provera `Origin` na svakom mutirajućem zahtevu | nije primenljivo |
@@ -159,10 +159,10 @@ _Globalna autentifikacija i sesije. Opaque tokeni, rotirajući refresh sa detekc
 |---|---|---|---|---|---|
 | `GET` | `/auth/invitations/{invitationToken}` | Pregled pozivnice iz e-mail linka (organizacija, uloga, da li je potrebna registracija). (`previewInvitation`) | javno | P0 | projektovano |
 | `POST` | `/auth/register` | Registracija isključivo preko pozivnice; kreira nalog, prihvata pozivnicu, šalje verifikaciju e-maila i otvara sesiju. (`register`) | javno | P0 | projektovano |
-| `POST` | `/auth/login` | Prijava e-mailom i lozinkom; mobilni dobija Bearer tokene, a web HttpOnly kolačiće. MFA i CSRF su sledeći koraci. (`login`) | javno | P0 | delimično implementirano |
+| `POST` | `/auth/login` | Prijava e-mailom i lozinkom; mobilni dobija Bearer tokene, a web HttpOnly kolačiće + session-bound CSRF cookie. MFA je sledeći korak. (`login`) | javno | P0 | delimično implementirano |
 | `POST` | `/auth/refresh` | Atomska Bearer rotacija refresh tokena; ponovna upotreba potrošenog tokena opoziva celu porodicu sesije. (`refreshSession`) | javno | P0 | delimično implementirano |
 | `GET` | `/auth/session` | Bootstrap web sesije: korisnik i aktivna članstva; 401 bez važeće sesije. (`getCurrentSession`) | OWNER, ADMIN, TEACHER, PARENT, SUPER_ADMIN, SUPPORT | P0 | delimično implementirano |
-| `POST` | `/auth/logout` | Odjava tekuće sesije (uređaja) i brisanje kolačića / push tokena te sesije. (`logout`) | OWNER, ADMIN, TEACHER, PARENT, SUPER_ADMIN, SUPPORT | P0 | projektovano |
+| `POST` | `/auth/logout` | Odjava tekuće sesije (uređaja), opoziv access/refresh tokena i brisanje web kolačića. Cookie režim zahteva CSRF + tačan Origin. (`logout`) | OWNER, ADMIN, TEACHER, PARENT, SUPER_ADMIN, SUPPORT | P0 | delimično implementirano |
 | `POST` | `/auth/logout-all` | Odjava sa svih uređaja (opoziv svih sesija korisnika). (`logoutAll`) | OWNER, ADMIN, TEACHER, PARENT, SUPER_ADMIN, SUPPORT [reauth] | P0 | projektovano |
 | `GET` | `/auth/sessions` | Lista aktivnih sesija (uređaja) korisnika sa oznakom tekuće. (`listSessions`) | OWNER, ADMIN, TEACHER, PARENT, SUPER_ADMIN, SUPPORT | P0 | projektovano |
 | `DELETE` | `/auth/sessions/{sessionId}` | Opoziv jedne sesije (udaljena odjava uređaja). (`revokeSession`) | OWNER, ADMIN, TEACHER, PARENT, SUPER_ADMIN, SUPPORT | P0 | projektovano |
@@ -745,10 +745,10 @@ Bez `purpose` → `422`; vaspitač bez `CHILD_HEALTH_READ` (ili OWNER bez nje) �
 | Stavka | Stanje |
 |---|---|
 | `GET /health/live`, `GET /health/ready` | **implementirano** u skeleton-u (Ktor bootstrap; readiness proverava bazu i migracije) |
-| `POST /auth/login`, `POST /auth/refresh`, `GET /auth/session` | **delimično implementirano** – login za verifikovanog korisnika proverava Argon2id i izdaje opaque tokene ili web HttpOnly kolačiće; refresh radi atomsku rotaciju i reuse detekciju; session bootstrap vraća minimalni SPA profil i aktivna članstva; ne zamenjivati lažnom prijavom ni prečicom koja zaobilazi dozvole |
+| `POST /auth/login`, `POST /auth/refresh`, `GET /auth/session`, `POST /auth/logout` | **delimično implementirano** – login za verifikovanog korisnika proverava Argon2id i izdaje opaque tokene ili web HttpOnly + CSRF kolačiće; refresh radi atomsku rotaciju, CSRF/Origin proveru i reuse detekciju; session bootstrap vraća minimalni SPA profil i aktivna članstva; logout opoziva tekuću sesiju i briše kolačiće; ne zamenjivati lažnom prijavom ni prečicom koja zaobilazi dozvole |
 | Sve ostale operacije ({{DESIGNED}} od 167) | **samo projektovane** – postoje u `docs/openapi.yaml` sa `x-status: designed`; nema koda, nema ruta, nema testova |
 
-Konkretno, nije implementirano ništa od: registracije preko pozivnice, verifikacije e-maila, reset lozinke, sesija i opoziva, MFA, push tokena; `/me`; `/platform/*`; tenant konteksta i RLS runtime-a; objekata, grupa, zaposlenih, pozivnica, dozvola, dodela; dece, upisa, staratelja, ovlašćenih osoba, zdravstvenih profila; rasporeda (šabloni, izmene, neradni dani, preview, zamrzavanje planova); odsustava; prisustva (komande, projekcija, dnevni pregled, offline sync); obaveštenja i notifikacija (outbox, FCM/APNs); kalendara; jelovnika; fajlova i fotografija (upload, karantin, skeniranje, signed URL); saglasnosti; poruka; audit loga; izveštaja; zahteva za privatnost; dashboard-a.
+Konkretno, nije implementirano ništa od: registracije preko pozivnice, verifikacije e-maila, reset lozinke, liste i udaljenog opoziva sesija, logout-all, MFA, push tokena; `/me`; `/platform/*`; tenant konteksta i RLS runtime-a; objekata, grupa, zaposlenih, pozivnica, dozvola, dodela; dece, upisa, staratelja, ovlašćenih osoba, zdravstvenih profila; rasporeda (šabloni, izmene, neradni dani, preview, zamrzavanje planova); odsustava; prisustva (komande, projekcija, dnevni pregled, offline sync); obaveštenja i notifikacija (outbox, FCM/APNs); kalendara; jelovnika; fajlova i fotografija (upload, karantin, skeniranje, signed URL); saglasnosti; poruka; audit loga; izveštaja; zahteva za privatnost; dashboard-a.
 
 Takođe nije urađeno (i ne tvrdi se): opterećenje/performanse, produkcijska podešavanja rate limitinga, penetracioni test, provere na nativnom PostgreSQL 17, mobilni i web klijenti za ove endpointe. Sledeći korak po roadmap-u je **EPIC 02 – autentifikacija, sesije i dozvole**, čime `login`/`refresh` prelaze iz `implemented-stub` u `implemented`, a zatim EPIC 03 (organizacije i tenant kontekst).
 

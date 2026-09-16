@@ -1,6 +1,6 @@
-# Izveštaj o validaciji – foundation skeleton (EPIC 01)
+# Izveštaj o validaciji – foundation skeleton + EPIC 02 auth slice
 
-Datum: 16. 9. 2026. Okruženje: Windows 11 Pro, bez sistemskog JDK-a, bez Android SDK-a, bez Xcode-a; Node 22.23.1; Docker Desktop 4.83.0 instaliran ali **ne radi** (vidi §5). Za provere je korišćen prenosivi Temurin JDK 21.0.12.1, Gradle 9.3.0 i **nativni PostgreSQL 17.11** (EDB binarni paket) u privremenom folderu van repozitorijuma.
+Datum: 16. 9. 2026. Okruženje: Windows 11 Pro, bez sistemskog JDK-a, bez Android SDK-a, bez Xcode-a; Node 22.23.1; Docker Desktop 4.83.0. Backend build i runtime provere izvršene su u Dockeru sa Temurin JDK/JRE 21 i PostgreSQL 17.11.
 
 Ništa od prethodno prijavljenih provera iz ranijeg planiranja nije preuzeto – sve ispod je izvršeno u ovom okruženju.
 
@@ -15,7 +15,7 @@ Ništa od prethodno prijavljenih provera iz ranijeg planiranja nije preuzeto –
 
 | Deo | Implementirano |
 |---|---|
-| Backend | Ktor bootstrap; `serve` / `migrate` / `benchmark-argon2` komande; env konfiguracija bez default tajni van DEV; Hikari pool-ovi (runtime/owner); `Database.transaction(DbContext)` sa `set_config(..., true)`; Flyway V1 (29 tabela + RLS + grants + feature flagovi); `/health/live`, `/health/ready` (baza + migracije); problem+json, request id, sanitizovano logovanje, bezbednosna zaglavlja; auth rute zatvorene (`501`), `GET /auth/session` i tenant/platform rute → `401`; Argon2id hasher, generator/hash tokena; `PermissionMatrix` |
+| Backend | Ktor bootstrap; `serve` / `migrate` / `benchmark-argon2` komande; env konfiguracija bez default tajni van DEV; Hikari pool-ovi (runtime/owner); `Database.transaction(DbContext)` sa `set_config(..., true)`; Flyway V1+V2 (29 tabela + RLS + grants + feature flagovi + session CSRF hash); `/health/live`, `/health/ready` (baza + migracije); problem+json, request id, sanitizovano logovanje, bezbednosna zaglavlja; Argon2id login, opaque access/refresh rotacija, cookie session bootstrap, session-bound CSRF/Origin provera i logout opoziv; `PermissionMatrix` |
 | Baza | `scripts/db/00_roles.sql` (app_owner/app_runtime/app_worker, bez BYPASSRLS), `V1__foundation.sql`, seed sa guard-om protiv ne-dev baze, `rls_negative_tests.sql` (37 tvrdnji) |
 | Web | React 19 + TS strict + Vite ljuska: login forma koja prikazuje `501` problem, health widget, i18n (sr-Latn, sr-Cyrl, en), tenant switcher sa brisanjem keša, 16 placeholder ekrana, 17 testova |
 | Mobile | KMP: `shared-core` (API klijent, problem parser, `DailyCounters`, i18n katalog, auth skeleton bez tokena; 25 testova), `shared-ui` (App ekran, locale switcher, „Check API”), `androidApp`, `iosApp` (XcodeGen) |
@@ -37,7 +37,8 @@ Ništa od prethodno prijavljenih provera iz ranijeg planiranja nije preuzeto –
 | 10 | OpenAPI lint | `npx @redocly/cli@2 lint docs/openapi.yaml` | **PROŠLO** – 0 grešaka, 0 upozorenja |
 | 11 | Web | `npm ci`, `npm run typecheck`, `npm run lint`, `npm run test -- --run`, `npm run build` | **PROŠLO** – 17/17 testova, build OK (izvršio agent u ovom okruženju; napomena: prvi `npm install` je zahtevao `--legacy-peer-deps` zbog npm 10 greške, lockfile posle toga radi sa `npm ci`) |
 | 12 | Mobile shared | `apps/mobile$ ./gradlew :shared-core:jvmTest` | **PROŠLO** – 25/25 testova (Kotlin 2.3.21, Gradle 9.3.0) |
-| 13 | Docker Compose | `docker compose up -d db` | **NIJE IZVRŠENO** – Docker daemon nedostupan (§5) |
+| 13 | Docker Compose | `docker compose --profile app up --build -d` | **PROŠLO** – `vrtic-db` healthy, API na `localhost:8080` |
+| 14 | Auth API end-to-end | lokalni HTTP smoke: web login → session → CSRF-negative → refresh → logout; Android login → bearer logout | **PROŠLO** – web login `200` + `vc_csrf`; nevažeći CSRF/Origin `403` bez promene sesije; refresh `200`; logout `204`; posle logout access `401`; mobile logout `204` i access `401` |
 
 Izvršeni backend testovi pokrivaju obavezne scenarije iz brief-a §27: dva tenant-a, korisnik sa članstvima u više tenant-a (SQL test: PARENT u A + TEACHER u B, tenant switcher, opoziv članstva sakriva organizaciju, korisnik ne može sam da menja svoje članstvo), pool leakage posle COMMIT/ROLLBACK, append-only audit, runtime bez DDL/RLS-disable/DELETE privilegija.
 
@@ -54,9 +55,9 @@ Izvršeni backend testovi pokrivaju obavezne scenarije iz brief-a §27: dva tena
 
 ## 5. Poznati problemi i otvorene odluke
 
-1. **Docker Desktop neispravan na razvojnoj mašini** (gore). Do popravke koristiti nativni PostgreSQL 17 sa `scripts/db/00_roles.sql`.
+1. Docker Desktop je sada dostupan za lokalni stack; nativni PostgreSQL ili Docker mogu se koristiti prema lokalnom okruženju.
 2. `hasCriticalHealthAlert` (boolean) se vraća u listi dece osoblju kao indikator „pročitaj zdravstveni profil”. Brief traži da zdravstveni podaci ne budu u listi; boolean ne nosi medicinski sadržaj, ali je odluka vlasnika proizvoda da li ostaje (lako se uklanja iz `ChildSummary`).
-3. Web ljuska poziva `GET /api/v1/auth/session` za bootstrap; do EPIC 02 uvek dobija 401 pa prikazuje samo login (ispravno, bez prečica).
+3. Web ljuska poziva `GET /api/v1/auth/session` za bootstrap; sa lokalnim dev seed nalogom može da se testira stvarni login, CSRF refresh i logout tok.
 4. `rls_negative_tests.sql` zavisi od seed podataka (fiksni UUID-jevi); CI ih učitava pre testa.
 5. `users` RLS politika sa podupitom nad `organization_memberships` – performanse izmeriti u EPIC 03 na realnom broju članova.
 6. `retention_policies` rokovi i pravni osnovi su predlozi – potvrditi sa pravnikom.
@@ -64,4 +65,4 @@ Izvršeni backend testovi pokrivaju obavezne scenarije iz brief-a §27: dva tena
 
 ## 6. Prvi sledeći implementacioni task
 
-**EPIC 02 – Autentifikacija, sesije i dozvole** (`docs/DEVELOPMENT_ROADMAP.md`, taskovi `E02-*`): registracija preko pozivnice, verifikacija e-maila, login sa Argon2id, opaque access/refresh tokeni sa rotacijom i detekcijom ponovne upotrebe, logout/sesije/opoziv, reset lozinke, reauth, MFA (TOTP), cookie režim + CSRF za web, bearer za mobile, rate limiting, audit, `SessionResolver` + `MembershipResolver` u pipeline-u i obavezni testovi (refresh replay, opoziv, multi-tenant korisnik, pool leakage). Prvi konkretan task: `E02-B01` – `SessionResolver` nad `access_tokens` sa `auth_mode` transakcijom i testom koji dokazuje da istekao/opozvan token daje 401.
+**EPIC 02 – Autentifikacija, sesije i dozvole** (`docs/DEVELOPMENT_ROADMAP.md`, taskovi `E02-*`) je u toku: login sa Argon2id, opaque access/refresh tokeni sa rotacijom i detekcijom ponovne upotrebe, web CSRF/Origin, logout tekuće sesije; preostaju registracija preko pozivnice, verifikacija e-maila, sesije (lista/opoziv/logout-all), reset lozinke, reauth, MFA (TOTP), bearer za mobile, rate limiting, audit, `MembershipResolver` u pipeline-u i ostali obavezni testovi.

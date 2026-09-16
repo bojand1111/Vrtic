@@ -4,6 +4,7 @@ import com.vrticconnect.config.AppConfig
 import com.vrticconnect.db.Database
 import com.vrticconnect.modules.auth.Argon2idPasswordHasher
 import com.vrticconnect.modules.auth.DatabaseSessionResolver
+import com.vrticconnect.modules.auth.CsrfService
 import com.vrticconnect.modules.auth.LoginService
 import com.vrticconnect.modules.auth.NotImplementedSessionResolver
 import com.vrticconnect.modules.auth.SessionResolver
@@ -31,8 +32,10 @@ class AppDependencies(
     val readiness: ReadinessProbe,
     /** Resolves an access token into an authenticated principal. */
     val sessionResolver: SessionResolver = database?.let(::DatabaseSessionResolver) ?: NotImplementedSessionResolver,
+    /** Validates web cookie mutations against the exact configured origin. */
+    val csrfService: CsrfService? = database?.let { CsrfService(it, config) },
     /** Issues sessions after validating credentials; omitted by DB-free route tests. */
-    val loginService: LoginService? = database?.let { LoginService(it, Argon2idPasswordHasher(config.argon2), config.isDev) },
+    val loginService: LoginService? = database?.let { LoginService(it, Argon2idPasswordHasher(config.argon2), config.isDev, csrfService) },
     /** Builds the SPA's current-user bootstrap response from the authenticated DB context. */
     val sessionService: SessionService? = database?.let(::SessionService),
 )
@@ -47,7 +50,7 @@ fun Application.module(deps: AppDependencies) {
     routing {
         healthRoutes(deps.readiness)
         route("/api/v1") {
-            authRoutes(deps.sessionResolver, deps.loginService, deps.sessionService)
+            authRoutes(deps.sessionResolver, deps.loginService, deps.sessionService, deps.csrfService)
             tenantRoutes(deps.sessionResolver)
         }
     }

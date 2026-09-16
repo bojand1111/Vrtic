@@ -77,6 +77,13 @@ class ProblemException(
             headers = mapOf("WWW-Authenticate" to "Bearer realm=\"vrtic\""),
         )
 
+        fun csrfInvalid() = ProblemException(
+            status = HttpStatusCode.Forbidden,
+            type = ProblemTypes.FORBIDDEN,
+            title = "CSRF validation failed",
+            detail = "CSRF_INVALID",
+        )
+
         /** Used for both "no permission" and "resource belongs to another tenant" — never reveals existence. */
         fun notFound() = ProblemException(
             status = HttpStatusCode.NotFound,
