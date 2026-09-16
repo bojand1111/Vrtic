@@ -1,0 +1,74 @@
+{
+  "app": {
+    "name": "Vrtić Connect",
+    "admin": "Admin",
+    "skipToContent": "Preskoči na sadržaj",
+    "loading": "Učitavanje…",
+    "placeholderNotice": "Ovaj ekran je zamena (placeholder) – poslovne funkcije još nisu implementirane."
+  },
+  "nav": {
+    "label": "Glavna navigacija",
+    "dashboard": "Kontrolna tabla",
+    "organizations": "Organizacije",
+    "locations": "Objekti",
+    "groups": "Grupe",
+    "children": "Deca",
+    "parents": "Roditelji",
+    "employees": "Zaposleni",
+    "attendance": "Prisustvo",
+    "schedules": "Rasporedi",
+    "announcements": "Obaveštenja",
+    "calendar": "Kalendar",
+    "meals": "Obroci",
+    "photos": "Fotografije",
+    "reports": "Izveštaji",
+    "settings": "Podešavanja",
+    "billing": "Naplata"
+  },
+  "common": {
+    "emptyState": "Još nema podataka",
+    "logout": "Odjava",
+    "locale": "Jezik",
+    "backHome": "Nazad na početnu"
+  },
+  "tenant": {
+    "switcherLabel": "Aktivna organizacija",
+    "none": "Nema dostupnih organizacija",
+    "platformAdmin": "Platformski administrator",
+    "chooseOrganization": "Izaberite organizaciju"
+  },
+  "auth": {
+    "loginTitle": "Prijava",
+    "loginIntro": "Prijavite se nalogom vrtića.",
+    "email": "E-pošta",
+    "password": "Lozinka",
+    "submit": "Prijavi se",
+    "submitting": "Prijavljivanje…",
+    "emailRequired": "Unesite e-poštu.",
+    "emailInvalid": "Unesite ispravnu adresu e-pošte.",
+    "passwordRequired": "Unesite lozinku.",
+    "formInvalid": "Obrazac sadrži greške. Proverite označena polja."
+  },
+  "errors": {
+    "network": "Nije moguće povezati se sa serverom. Proverite vezu i pokušajte ponovo.",
+    "generic": "Došlo je do greške. Pokušajte ponovo.",
+    "requestId": "ID zahteva",
+    "notFoundTitle": "Stranica nije pronađena",
+    "notFoundDetail": "Tražena stranica ne postoji ili je premeštena.",
+    "unexpectedTitle": "Neočekivana greška",
+    "unexpectedDetail": "Nešto je pošlo naopako. Osvežite stranicu ili pokušajte kasnije.",
+    "sessionExpired": "Sesija je istekla. Prijavite se ponovo."
+  },
+  "health": {
+    "label": "API",
+    "ok": "OK",
+    "unavailable": "nedostupno",
+    "checking": "provera…",
+    "recheck": "Proveri ponovo"
+  },
+  "locales": {
+    "sr-Latn": "Srpski (latinica)",
+    "sr-Cyrl": "Српски (ћирилица)",
+    "en": "English"
+  }
+}

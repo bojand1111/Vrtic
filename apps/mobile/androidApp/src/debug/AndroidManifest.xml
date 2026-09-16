@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-only overlay: merged on top of src/main/AndroidManifest.xml.
+     Enables cleartext HTTP exclusively for the emulator host alias (see res/xml/network_security_config.xml).
+     Release builds keep the platform default (cleartext blocked). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application android:networkSecurityConfig="@xml/network_security_config" />
+
+</manifest>

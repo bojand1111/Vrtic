@@ -1,0 +1,38 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+*.local.conf
+local.properties
+
+# JVM / Gradle
+.gradle/
+build/
+out/
+*.class
+*.log
+!docs/**/*.log
+
+# Kotlin/Native and Xcode
+.kotlin/
+apps/mobile/iosApp/Pods/
+apps/mobile/iosApp/*.xcworkspace
+apps/mobile/iosApp/**/xcuserdata/
+apps/mobile/iosApp/build/
+apps/mobile/iosApp/iosApp.xcodeproj/
+
+# Node
+node_modules/
+apps/admin-web/dist/
+apps/admin-web/coverage/
+
+# Docker volumes / data
+.data/

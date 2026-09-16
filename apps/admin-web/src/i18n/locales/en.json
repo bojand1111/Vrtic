@@ -1,0 +1,74 @@
+{
+  "app": {
+    "name": "Vrtić Connect",
+    "admin": "Admin",
+    "skipToContent": "Skip to content",
+    "loading": "Loading…",
+    "placeholderNotice": "This screen is a placeholder – business features are not implemented yet."
+  },
+  "nav": {
+    "label": "Main navigation",
+    "dashboard": "Dashboard",
+    "organizations": "Organizations",
+    "locations": "Locations",
+    "groups": "Groups",
+    "children": "Children",
+    "parents": "Parents",
+    "employees": "Employees",
+    "attendance": "Attendance",
+    "schedules": "Schedules",
+    "announcements": "Announcements",
+    "calendar": "Calendar",
+    "meals": "Meals",
+    "photos": "Photos",
+    "reports": "Reports",
+    "settings": "Settings",
+    "billing": "Billing"
+  },
+  "common": {
+    "emptyState": "No data yet",
+    "logout": "Log out",
+    "locale": "Language",
+    "backHome": "Back to home"
+  },
+  "tenant": {
+    "switcherLabel": "Active organization",
+    "none": "No organizations available",
+    "platformAdmin": "Platform administrator",
+    "chooseOrganization": "Choose an organization"
+  },
+  "auth": {
+    "loginTitle": "Sign in",
+    "loginIntro": "Sign in with your kindergarten account.",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "emailRequired": "Enter your email.",
+    "emailInvalid": "Enter a valid email address.",
+    "passwordRequired": "Enter your password.",
+    "formInvalid": "The form has errors. Check the highlighted fields."
+  },
+  "errors": {
+    "network": "Could not reach the server. Check your connection and try again.",
+    "generic": "Something went wrong. Please try again.",
+    "requestId": "Request ID",
+    "notFoundTitle": "Page not found",
+    "notFoundDetail": "The requested page does not exist or has moved.",
+    "unexpectedTitle": "Unexpected error",
+    "unexpectedDetail": "Something went wrong. Refresh the page or try again later.",
+    "sessionExpired": "Your session has expired. Please sign in again."
+  },
+  "health": {
+    "label": "API",
+    "ok": "OK",
+    "unavailable": "unavailable",
+    "checking": "checking…",
+    "recheck": "Re-check"
+  },
+  "locales": {
+    "sr-Latn": "Srpski (latinica)",
+    "sr-Cyrl": "Српски (ћирилица)",
+    "en": "English"
+  }
+}

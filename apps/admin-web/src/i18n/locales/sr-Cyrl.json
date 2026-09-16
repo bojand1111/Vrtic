@@ -1,0 +1,74 @@
+{
+  "app": {
+    "name": "Вртић Connect",
+    "admin": "Админ",
+    "skipToContent": "Прескочи на садржај",
+    "loading": "Учитавање…",
+    "placeholderNotice": "Овај екран је замена (placeholder) – пословне функције још нису имплементиране."
+  },
+  "nav": {
+    "label": "Главна навигација",
+    "dashboard": "Контролна табла",
+    "organizations": "Организације",
+    "locations": "Објекти",
+    "groups": "Групе",
+    "children": "Деца",
+    "parents": "Родитељи",
+    "employees": "Запослени",
+    "attendance": "Присуство",
+    "schedules": "Распореди",
+    "announcements": "Обавештења",
+    "calendar": "Календар",
+    "meals": "Оброци",
+    "photos": "Фотографије",
+    "reports": "Извештаји",
+    "settings": "Подешавања",
+    "billing": "Наплата"
+  },
+  "common": {
+    "emptyState": "Нема података",
+    "logout": "Одјава",
+    "locale": "Језик",
+    "backHome": "Назад на почетну"
+  },
+  "tenant": {
+    "switcherLabel": "Активна организација",
+    "none": "Нема доступних организација",
+    "platformAdmin": "Платформски администратор",
+    "chooseOrganization": "Изаберите организацију"
+  },
+  "auth": {
+    "loginTitle": "Пријава",
+    "loginIntro": "Пријавите се налогом вртића.",
+    "email": "Е-пошта",
+    "password": "Лозинка",
+    "submit": "Пријави се",
+    "submitting": "Пријављивање…",
+    "emailRequired": "Унесите е-пошту.",
+    "emailInvalid": "Унесите исправну адресу е-поште.",
+    "passwordRequired": "Унесите лозинку.",
+    "formInvalid": "Образац садржи грешке. Проверите означена поља."
+  },
+  "errors": {
+    "network": "Није могуће повезати се са сервером. Проверите везу и покушајте поново.",
+    "generic": "Дошло је до грешке. Покушајте поново.",
+    "requestId": "ИД захтева",
+    "notFoundTitle": "Страница није пронађена",
+    "notFoundDetail": "Тражена страница не постоји или је премештена.",
+    "unexpectedTitle": "Неочекивана грешка",
+    "unexpectedDetail": "Нешто је пошло наопако. Освежите страницу или покушајте касније.",
+    "sessionExpired": "Сесија је истекла. Пријавите се поново."
+  },
+  "health": {
+    "label": "API",
+    "ok": "OK",
+    "unavailable": "недоступно",
+    "checking": "провера…",
+    "recheck": "Провери поново"
+  },
+  "locales": {
+    "sr-Latn": "Srpski (latinica)",
+    "sr-Cyrl": "Српски (ћирилица)",
+    "en": "English"
+  }
+}

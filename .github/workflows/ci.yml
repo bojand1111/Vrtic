@@ -1,0 +1,175 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  JAVA_VERSION: "21"
+
+jobs:
+  backend:
+    name: Backend build, unit + PostgreSQL 17 integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-superuser
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      APP_ENV: dev
+      DB_HOST: 127.0.0.1
+      DB_PORT: "5432"
+      APP_DB_NAME: vrtic
+      APP_DB_OWNER_PASSWORD: ci-owner
+      APP_DB_RUNTIME_PASSWORD: ci-runtime
+      APP_DB_WORKER_PASSWORD: ci-worker
+      PGPASSWORD: ci-superuser
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Create database roles (cluster-level, outside migrations)
+        run: |
+          psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d postgres \
+            -v db_name="$APP_DB_NAME" -v owner_pw="$APP_DB_OWNER_PASSWORD" \
+            -v runtime_pw="$APP_DB_RUNTIME_PASSWORD" -v worker_pw="$APP_DB_WORKER_PASSWORD" \
+            -f scripts/db/00_roles.sql
+          psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d postgres -c "ALTER DATABASE vrtic SET app.environment = 'dev';"
+      - name: Build fat jar
+        working-directory: backend
+        run: ./gradlew buildFatJar --no-daemon
+      - name: Run migrations (single migration job, owner role)
+        run: java -jar backend/build/libs/vrtic-backend-all.jar migrate
+      - name: Load synthetic seed (owner, maintenance mode)
+        run: PGPASSWORD="$APP_DB_OWNER_PASSWORD" psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U app_owner -d vrtic -f docs/database/seed/dev_seed.sql
+      - name: RLS negative tests (runtime role)
+        run: PGPASSWORD="$APP_DB_RUNTIME_PASSWORD" psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U app_runtime -d vrtic -f docs/database/tests/rls_negative_tests.sql
+      - name: Unit + integration tests (VRTIC_TEST_DB=1 enables RlsIntegrationTest)
+        working-directory: backend
+        env:
+          VRTIC_TEST_DB: "1"
+        run: ./gradlew test --no-daemon
+      - name: Validate full schema proposal parses on PostgreSQL 17 (separate database)
+        run: |
+          psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d postgres -c "CREATE DATABASE vrtic_proposal OWNER app_owner;"
+          psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U postgres -d vrtic_proposal -c "CREATE EXTENSION pgcrypto; CREATE EXTENSION citext; CREATE EXTENSION btree_gist;"
+          PGPASSWORD="$APP_DB_OWNER_PASSWORD" psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -U app_owner -d vrtic_proposal -f docs/database/schema.sql
+      - name: API smoke (health, closed auth routes)
+        run: |
+          java -jar backend/build/libs/vrtic-backend-all.jar serve & echo $! > api.pid
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8080/health/live && break; sleep 1; done
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/health/ready)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:8080/api/v1/auth/login)" = "501"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/api/v1/organizations/00000000-0000-0000-0000-000000000001/ping)" = "401"
+          kill "$(cat api.pid)"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-reports
+          path: backend/build/reports/tests/test
+
+  openapi:
+    name: OpenAPI lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npx --yes @redocly/cli@2 lint docs/openapi.yaml
+
+  admin-web:
+    name: Admin web typecheck, lint, test, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/admin-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/admin-web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test -- --run
+      - run: npm run build
+
+  mobile-shared:
+    name: Mobile shared-core tests (no Android SDK needed)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :shared-core:jvmTest --no-daemon
+
+  android:
+    name: Android debug build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :androidApp:assembleDebug --no-daemon
+
+  ios:
+    # Documented gate: runs on a macOS runner (billed minutes). Framework compile only until XcodeGen
+    # project generation is wired; full `xcodebuild` is EPIC 01 follow-up.
+    name: iOS framework compile (macOS)
+    runs-on: macos-latest
+    if: github.event_name == 'push'
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :shared-ui:linkDebugFrameworkIosSimulatorArm64 --no-daemon
+
+  security-scan:
+    name: Dependency and secret scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Dependency review (pull requests only)
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
