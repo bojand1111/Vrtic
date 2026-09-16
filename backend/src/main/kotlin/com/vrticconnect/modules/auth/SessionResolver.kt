@@ -27,8 +27,8 @@ data class MembershipContext(
 
 /**
  * Resolves credentials carried by the request into an [AuthenticatedUser].
- * Implementations resolve opaque access tokens and may later add the web cookie mode with
- * CSRF/Origin verification.
+ * Opaque access tokens can arrive as Bearer credentials or the web access cookie; CSRF/Origin
+ * verification for mutating cookie requests is a subsequent task.
  */
 fun interface SessionResolver {
     suspend fun resolve(call: ApplicationCall): AuthenticatedUser?
@@ -101,7 +101,7 @@ object NotImplementedSessionResolver : SessionResolver {
 suspend fun RoutingContext.requireUser(resolver: SessionResolver): AuthenticatedUser =
     resolver.resolve(call) ?: throw ProblemException.unauthenticated()
 
-/** Extracts a bearer token without logging it; cookie mode is added in a later auth task. */
+/** Extracts a bearer token without logging it. Web cookie fallback is handled by the resolver. */
 fun ApplicationCall.bearerToken(): String? =
     request.headers[HttpHeaders.Authorization]
         ?.takeIf { it.startsWith("Bearer ", ignoreCase = true) }

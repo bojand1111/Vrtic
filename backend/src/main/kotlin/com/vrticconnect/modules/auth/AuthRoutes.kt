@@ -8,15 +8,21 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 
 /**
- * Authentication endpoints are implemented incrementally. Login is available when the real
- * database dependencies are wired; remaining endpoints stay explicitly closed until implemented.
+ * Authentication endpoints are implemented incrementally. Login, refresh and session bootstrap
+ * are available when the real database dependencies are wired; remaining endpoints stay closed.
  */
-fun Route.authRoutes(sessionResolver: SessionResolver, loginService: LoginService? = null) {
+fun Route.authRoutes(
+    sessionResolver: SessionResolver,
+    loginService: LoginService? = null,
+    sessionService: SessionService? = null,
+) {
     route("/auth") {
-        // Current session is still a 501 stub after credentials are resolved.
+        // DB-backed deployments return the minimal SPA bootstrap payload; DB-free route tests keep the stub.
         get("/session") {
-            requireUser(sessionResolver)
-            throw ProblemException.notImplemented("Session info")
+            sessionService?.current(call, sessionResolver) ?: run {
+                requireUser(sessionResolver)
+                throw ProblemException.notImplemented("Session info")
+            }
         }
         post("/register") { throw ProblemException.notImplemented("Registration") }
         post("/login") { loginService?.login(call) ?: throw ProblemException.notImplemented("Login") }

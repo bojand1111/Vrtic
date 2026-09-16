@@ -14,8 +14,8 @@ info:
     platform operator).
 
 
-    **Status.** Only `GET /health/live`, `GET /health/ready` and the `POST /auth/login` / `POST /auth/refresh` stubs (returning `501 Not
-    Implemented`) exist in the current skeleton. Every other operation is marked `x-status: designed` and is NOT implemented.
+    **Status.** `GET /health/live`, `GET /health/ready`, `POST /auth/login`, `POST /auth/refresh` and `GET /auth/session` have a
+    DB-backed partial implementation. Every other operation is marked `x-status: designed` and is NOT implemented.
 
 
     **Conventions**
@@ -274,7 +274,7 @@ paths:
         Verifies credentials (Argon2id) and creates a session for the device. Web clients receive HttpOnly cookies + `csrfToken`; mobile
         clients receive `tokens`. Accounts with MFA get `status: MFA_REQUIRED` and a `mfaChallengeToken`. Failed attempts are counted per
         e-mail hash and IP; generic `401 INVALID_CREDENTIALS` is returned whether the account exists or not. The current implementation covers
-        verified-user Bearer login and opaque token issuance; cookie delivery, MFA and rate limiting are subsequent EPIC 02 tasks.
+        verified-user Argon2id login, opaque token issuance and web HttpOnly cookie delivery; MFA, rate limiting and CSRF are subsequent tasks.
       security: []
       requestBody:
         required: true
@@ -361,8 +361,8 @@ paths:
       summary: Current session (web bootstrap)
       description: >-
         Returns the current session summary (user, session, client kind, MFA state, CSRF token in cookie mode, membership summary) so the
-        web admin can restore its state after a page load without a second round-trip. `401` (Problem) when there is no valid session.
-        **Current skeleton: answers `401` when no session cookie/token is present, otherwise `501` (auth not implemented).**
+        web admin can restore its state after a page load without a second round-trip. `401` (Problem) when there is no valid session. The current
+        implementation returns the authenticated user and active membership summary; CSRF token delivery is a subsequent task.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -390,7 +390,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: implemented-stub
+      x-status: implemented-partial
       x-roles:
         - OWNER
         - ADMIN

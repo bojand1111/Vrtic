@@ -2,7 +2,7 @@
 
 > **Status:** projektni dokument. Mašinski čitljiv izvor istine je `docs/openapi.yaml` (OpenAPI 3.1, 167 operacija). Ovaj dokument je njegov pregled na srpskom; identifikatori (path-ovi, polja, kodovi, `operationId`) su na engleskom i moraju se poklapati sa YAML-om. Nazivi polja prate kolone iz `docs/database/schema.sql` u camelCase obliku.
 >
-> U trenutnom skeleton-u postoje `GET /health/live`, `GET /health/ready` i delimično implementirani Bearer `POST /auth/login` i `POST /auth/refresh`; `GET /auth/session` je i dalje stub (`401` kad nema sesije). Sve ostalo je **projektovano, a nije implementirano** (v. poslednji odeljak).
+> U trenutnom skeleton-u postoje `GET /health/live`, `GET /health/ready` i delimično implementirani `POST /auth/login`, `POST /auth/refresh` i `GET /auth/session`; bez važeće sesije session endpoint vraća `401`. Sve ostalo je **projektovano, a nije implementirano** (v. poslednji odeljak).
 
 Sadržaj:
 
@@ -159,9 +159,9 @@ _Globalna autentifikacija i sesije. Opaque tokeni, rotirajući refresh sa detekc
 |---|---|---|---|---|---|
 | `GET` | `/auth/invitations/{invitationToken}` | Pregled pozivnice iz e-mail linka (organizacija, uloga, da li je potrebna registracija). (`previewInvitation`) | javno | P0 | projektovano |
 | `POST` | `/auth/register` | Registracija isključivo preko pozivnice; kreira nalog, prihvata pozivnicu, šalje verifikaciju e-maila i otvara sesiju. (`register`) | javno | P0 | projektovano |
-| `POST` | `/auth/login` | Prijava e-mailom i lozinkom; web dobija HttpOnly kolačiće + CSRF token, mobilni dobija tokene; MFA korak ako je uključen. (`login`) | javno | P0 | stub (501) |
-| `POST` | `/auth/refresh` | Atomska rotacija refresh tokena; ponovna upotreba potrošenog tokena opoziva celu porodicu sesije. (`refreshSession`) | javno | P0 | stub (501) |
-| `GET` | `/auth/session` | Bootstrap web sesije: sažetak tekuće sesije (korisnik, sesija, clientKind, MFA stanje, CSRF token, članstva); 401 bez važeće sesije. (`getCurrentSession`) | OWNER, ADMIN, TEACHER, PARENT, SUPER_ADMIN, SUPPORT | P0 | stub (501) |
+| `POST` | `/auth/login` | Prijava e-mailom i lozinkom; mobilni dobija Bearer tokene, a web HttpOnly kolačiće. MFA i CSRF su sledeći koraci. (`login`) | javno | P0 | delimično implementirano |
+| `POST` | `/auth/refresh` | Atomska Bearer rotacija refresh tokena; ponovna upotreba potrošenog tokena opoziva celu porodicu sesije. (`refreshSession`) | javno | P0 | delimično implementirano |
+| `GET` | `/auth/session` | Bootstrap web sesije: korisnik i aktivna članstva; 401 bez važeće sesije. (`getCurrentSession`) | OWNER, ADMIN, TEACHER, PARENT, SUPER_ADMIN, SUPPORT | P0 | delimično implementirano |
 | `POST` | `/auth/logout` | Odjava tekuće sesije (uređaja) i brisanje kolačića / push tokena te sesije. (`logout`) | OWNER, ADMIN, TEACHER, PARENT, SUPER_ADMIN, SUPPORT | P0 | projektovano |
 | `POST` | `/auth/logout-all` | Odjava sa svih uređaja (opoziv svih sesija korisnika). (`logoutAll`) | OWNER, ADMIN, TEACHER, PARENT, SUPER_ADMIN, SUPPORT [reauth] | P0 | projektovano |
 | `GET` | `/auth/sessions` | Lista aktivnih sesija (uređaja) korisnika sa oznakom tekuće. (`listSessions`) | OWNER, ADMIN, TEACHER, PARENT, SUPER_ADMIN, SUPPORT | P0 | projektovano |
@@ -520,7 +520,7 @@ Authorization: Bearer vca_Zt4…
 HTTP/1.1 204 No Content
 ```
 
-**Trenutni skeleton** vraća za `login` i `refresh`:
+**Pre ove implementacije** skeleton je vraćao za `login` i `refresh`:
 
 ```http
 HTTP/1.1 501 Not Implemented
@@ -745,7 +745,7 @@ Bez `purpose` → `422`; vaspitač bez `CHILD_HEALTH_READ` (ili OWNER bez nje) �
 | Stavka | Stanje |
 |---|---|
 | `GET /health/live`, `GET /health/ready` | **implementirano** u skeleton-u (Ktor bootstrap; readiness proverava bazu i migracije) |
-| `POST /auth/login`, `POST /auth/refresh`, `GET /auth/session` | **delimično implementirano** – login za verifikovanog Bearer klijenta proverava Argon2id i izdaje opaque tokene; refresh radi atomsku rotaciju i reuse detekciju; session bootstrap je još stub; ne zamenjivati lažnom prijavom ni prečicom koja zaobilazi dozvole |
+| `POST /auth/login`, `POST /auth/refresh`, `GET /auth/session` | **delimično implementirano** – login za verifikovanog korisnika proverava Argon2id i izdaje opaque tokene ili web HttpOnly kolačiće; refresh radi atomsku rotaciju i reuse detekciju; session bootstrap vraća minimalni SPA profil i aktivna članstva; ne zamenjivati lažnom prijavom ni prečicom koja zaobilazi dozvole |
 | Sve ostale operacije ({{DESIGNED}} od 167) | **samo projektovane** – postoje u `docs/openapi.yaml` sa `x-status: designed`; nema koda, nema ruta, nema testova |
 
 Konkretno, nije implementirano ništa od: registracije preko pozivnice, verifikacije e-maila, reset lozinke, sesija i opoziva, MFA, push tokena; `/me`; `/platform/*`; tenant konteksta i RLS runtime-a; objekata, grupa, zaposlenih, pozivnica, dozvola, dodela; dece, upisa, staratelja, ovlašćenih osoba, zdravstvenih profila; rasporeda (šabloni, izmene, neradni dani, preview, zamrzavanje planova); odsustava; prisustva (komande, projekcija, dnevni pregled, offline sync); obaveštenja i notifikacija (outbox, FCM/APNs); kalendara; jelovnika; fajlova i fotografija (upload, karantin, skeniranje, signed URL); saglasnosti; poruka; audit loga; izveštaja; zahteva za privatnost; dashboard-a.

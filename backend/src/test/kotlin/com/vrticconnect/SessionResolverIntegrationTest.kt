@@ -27,6 +27,7 @@ import org.junit.jupiter.api.TestInstance
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /** Native PostgreSQL proof for E02-B01. Skipped unless VRTIC_TEST_DB=1 is explicitly enabled. */
@@ -116,7 +117,9 @@ class SessionResolverIntegrationTest {
             )
         }
 
-        assertEquals(HttpStatusCode.NotImplemented, requestWith(validToken).status)
+        val currentSession = requestWith(validToken)
+        assertEquals(HttpStatusCode.OK, currentSession.status)
+        assertTrue(currentSession.bodyAsText().contains(email))
         assertEquals(HttpStatusCode.Unauthorized, requestWith(expiredToken).status)
         assertEquals(HttpStatusCode.Unauthorized, requestWith(revokedToken).status)
         assertEquals(HttpStatusCode.Unauthorized, requestWith(revokedSessionToken).status)
@@ -174,6 +177,37 @@ class SessionResolverIntegrationTest {
             setBody("""{"refreshToken":"$refreshToken"}""")
         }
         assertEquals(HttpStatusCode.Unauthorized, reused.status)
+    }
+
+    @Test
+    fun `web login sets HttpOnly cookies and session bootstrap reads access cookie`() = testApplication {
+        application {
+            module(
+                AppDependencies(
+                    config = config,
+                    database = runtimeDb,
+                    readiness = AlwaysUpProbe,
+                    sessionResolver = DatabaseSessionResolver(runtimeDb),
+                ),
+            )
+        }
+
+        val login = client.post("/api/v1/auth/login") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"email":"$email","password":"$testPassword","clientKind":"WEB"}""")
+        }
+        assertEquals(HttpStatusCode.OK, login.status)
+        val cookies = login.headers.getAll(HttpHeaders.SetCookie).orEmpty()
+        val accessCookie = cookies.first { it.startsWith("vc_access=") }
+        assertTrue(accessCookie.contains("HttpOnly"))
+        assertTrue(cookies.any { it.startsWith("vc_refresh=") && it.contains("HttpOnly") })
+        assertFalse(login.bodyAsText().contains("vca_"))
+
+        val current = client.get("/api/v1/auth/session") {
+            header(HttpHeaders.Cookie, accessCookie.substringBefore(';'))
+        }
+        assertEquals(HttpStatusCode.OK, current.status)
+        assertTrue(current.bodyAsText().contains(email))
     }
 
     private suspend fun io.ktor.server.testing.ApplicationTestBuilder.requestWith(token: String) =

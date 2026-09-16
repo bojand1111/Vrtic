@@ -3,6 +3,7 @@ package com.vrticconnect.modules.auth
 import com.vrticconnect.db.Database
 import com.vrticconnect.db.DbContext
 import com.vrticconnect.http.ProblemException
+import io.ktor.http.HttpHeaders
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -53,6 +54,7 @@ data class AuthResult(
 class LoginService(
     private val database: Database,
     private val passwordHasher: PasswordHasher,
+    private val devMode: Boolean,
 ) {
     suspend fun login(call: ApplicationCall) {
         val request = call.receive<LoginRequest>()
@@ -99,7 +101,13 @@ class LoginService(
                     ),
                 )
             }
-            call.respond(result)
+            if (clientKind == "WEB" && result.tokens != null) {
+                appendTokenCookie(call, "vc_access", result.tokens.accessToken, 600, "/api")
+                appendTokenCookie(call, "vc_refresh", result.tokens.refreshToken, 604_800, "/api/v1/auth/refresh")
+                call.respond(result.copy(tokens = null))
+            } else {
+                call.respond(result)
+            }
         } finally {
             passwordChars.fill('\u0000')
         }
@@ -287,6 +295,14 @@ class LoginService(
             statement.setObject(1, sessionId)
             statement.executeUpdate()
         }
+    }
+
+    private fun appendTokenCookie(call: ApplicationCall, name: String, value: String, maxAgeSeconds: Int, path: String) {
+        val secure = if (devMode) "" else "; Secure"
+        call.response.headers.append(
+            HttpHeaders.SetCookie,
+            "$name=$value; Max-Age=$maxAgeSeconds; Path=$path; HttpOnly; SameSite=Lax$secure",
+        )
     }
 
     private data class LoginUser(
