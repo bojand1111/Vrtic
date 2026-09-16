@@ -43,10 +43,12 @@ class SessionResolverIntegrationTest {
     private val userId = UUID.randomUUID()
     private val validSessionId = UUID.randomUUID()
     private val revokedSessionId = UUID.randomUUID()
+    private val refreshSessionId = UUID.randomUUID()
     private val validToken = Tokens.generate(Tokens.Kind.ACCESS)
     private val expiredToken = Tokens.generate(Tokens.Kind.ACCESS)
     private val revokedToken = Tokens.generate(Tokens.Kind.ACCESS)
     private val revokedSessionToken = Tokens.generate(Tokens.Kind.ACCESS)
+    private val refreshToken = Tokens.generate(Tokens.Kind.REFRESH)
     private val testPassword = "correct horse battery staple"
     private val email = "session-test-${userId}@example.test"
 
@@ -78,10 +80,12 @@ class SessionResolverIntegrationTest {
             }
             insertSession(connection, validSessionId, null)
             insertSession(connection, revokedSessionId, "now()")
+            insertSession(connection, refreshSessionId, null)
             insertToken(connection, validSessionId, validToken, "now() + interval '10 minutes'", null)
             insertToken(connection, validSessionId, expiredToken, "now() - interval '1 minute'", null)
             insertToken(connection, validSessionId, revokedToken, "now() + interval '10 minutes'", "now()")
             insertToken(connection, revokedSessionId, revokedSessionToken, "now() + interval '10 minutes'", null)
+            insertRefreshToken(connection, refreshSessionId, refreshToken)
         }
     }
 
@@ -142,6 +146,36 @@ class SessionResolverIntegrationTest {
         assertTrue(body.contains("\"refreshToken\":\"vcr_"))
     }
 
+    @Test
+    fun `refresh rotates once and reuse revokes the session`() = testApplication {
+        application {
+            module(
+                AppDependencies(
+                    config = config,
+                    database = runtimeDb,
+                    readiness = AlwaysUpProbe,
+                    sessionResolver = DatabaseSessionResolver(runtimeDb),
+                ),
+            )
+        }
+
+        val response = client.post("/api/v1/auth/refresh") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"refreshToken":"$refreshToken"}""")
+        }
+        assertEquals(HttpStatusCode.OK, response.status)
+        val rotated = response.bodyAsText()
+        assertTrue(rotated.contains("\"status\":\"AUTHENTICATED\""))
+        assertTrue(rotated.contains("\"accessToken\":\"vca_"))
+        assertTrue(rotated.contains("\"refreshToken\":\"vcr_"))
+
+        val reused = client.post("/api/v1/auth/refresh") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"refreshToken":"$refreshToken"}""")
+        }
+        assertEquals(HttpStatusCode.Unauthorized, reused.status)
+    }
+
     private suspend fun io.ktor.server.testing.ApplicationTestBuilder.requestWith(token: String) =
         client.get("/api/v1/auth/session") { header(HttpHeaders.Authorization, "Bearer $token") }
 
@@ -174,6 +208,16 @@ class SessionResolverIntegrationTest {
         connection.prepareStatement(
             "INSERT INTO app.access_tokens (session_id, token_hash, expires_at, revoked_at) " +
                 "VALUES (?, ?, $expiresAt, $revokedExpression)",
+        ).use { statement ->
+            statement.setObject(1, sessionId)
+            statement.setBytes(2, Tokens.sha256(token))
+            statement.executeUpdate()
+        }
+    }
+
+    private fun insertRefreshToken(connection: java.sql.Connection, sessionId: UUID, token: String) {
+        connection.prepareStatement(
+            "INSERT INTO app.refresh_tokens (session_id, token_hash, idle_expires_at) VALUES (?, ?, now() + interval '7 days')",
         ).use { statement ->
             statement.setObject(1, sessionId)
             statement.setBytes(2, Tokens.sha256(token))

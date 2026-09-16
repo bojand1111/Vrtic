@@ -2,7 +2,7 @@
 
 SaaS platforma za privatne vrtiće: mobilna aplikacija za roditelje i vaspitače (Kotlin Multiplatform + Compose), web administracija (React + Vite) i jedan Ktor backend nad PostgreSQL-om sa Row Level Security izolacijom po vrtiću.
 
-> **Stanje:** foundation skeleton (EPIC 01) plus prvi EPIC 02 auth korak: Bearer login izdaje opaque access/refresh tokene, a resolver proverava njihovu validnost i opoziv. Refresh, cookie režim i poslovni moduli još nisu implementirani. Šta je stvarno provereno piše u [docs/VALIDATION_REPORT.md](docs/VALIDATION_REPORT.md). Sledeći korak je nastavak [EPIC 02](docs/DEVELOPMENT_ROADMAP.md).
+> **Stanje:** foundation skeleton (EPIC 01) plus EPIC 02 Bearer login i refresh rotacija: izdaju se opaque access/refresh tokeni, resolver proverava validnost i opoziv, a reuse refresh tokena opoziva sesiju. Web cookie režim i poslovni moduli još nisu implementirani. Šta je stvarno provereno piše u [docs/VALIDATION_REPORT.md](docs/VALIDATION_REPORT.md). Sledeći korak je nastavak [EPIC 02](docs/DEVELOPMENT_ROADMAP.md).
 
 ## Dokumentacija
 

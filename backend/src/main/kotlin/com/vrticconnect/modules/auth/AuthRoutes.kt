@@ -20,7 +20,7 @@ fun Route.authRoutes(sessionResolver: SessionResolver, loginService: LoginServic
         }
         post("/register") { throw ProblemException.notImplemented("Registration") }
         post("/login") { loginService?.login(call) ?: throw ProblemException.notImplemented("Login") }
-        post("/refresh") { throw ProblemException.notImplemented("Token refresh") }
+        post("/refresh") { loginService?.refresh(call) ?: throw ProblemException.notImplemented("Token refresh") }
         post("/logout") { throw ProblemException.notImplemented("Logout") }
         post("/logout-all") { throw ProblemException.notImplemented("Logout from all devices") }
         get("/sessions") { throw ProblemException.notImplemented("Session list") }

@@ -319,9 +319,9 @@ paths:
         - Auth
       summary: Rotate the refresh token
       description: >-
-        Atomically consumes the presented refresh token and issues a new access/refresh pair (cookie or body). Reuse of an already consumed
-        token revokes the whole session family and returns `401 REFRESH_REUSE_DETECTED`. Idle expiry 7 days, absolute 30 days. **Current
-        skeleton: returns `501`.**
+        Atomically consumes the presented Bearer refresh token and issues a new access/refresh pair. Reuse of an already consumed token revokes
+        the whole session family and returns `401 REFRESH_REUSE_DETECTED`. Idle expiry 7 days, absolute 30 days. Cookie delivery is a subsequent
+        EPIC 02 task.
       security: []
       requestBody:
         required: false
@@ -351,7 +351,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: implemented-stub
+      x-status: implemented-partial
       x-roles: []
   /auth/session:
     get:

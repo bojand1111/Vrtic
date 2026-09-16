@@ -52,5 +52,7 @@ class Argon2idPasswordHasherTest {
         assertFalse(Tokens.redact(a).contains(a.substring(6, 30)))
         assertTrue(Tokens.isAccessToken(Tokens.generate(Tokens.Kind.ACCESS)))
         assertFalse(Tokens.isAccessToken(a))
+        assertTrue(Tokens.isRefreshToken(a))
+        assertFalse(Tokens.isRefreshToken(Tokens.generate(Tokens.Kind.ACCESS)))
     }
 }

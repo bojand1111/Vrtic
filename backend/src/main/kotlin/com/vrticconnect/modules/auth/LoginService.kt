@@ -38,6 +38,9 @@ data class TokenPair(
 )
 
 @Serializable
+data class RefreshRequest(val refreshToken: String? = null)
+
+@Serializable
 data class AuthResult(
     val status: String,
     val sessionId: String? = null,
@@ -102,6 +105,69 @@ class LoginService(
         }
     }
 
+    suspend fun refresh(call: ApplicationCall) {
+        val request = call.receive<RefreshRequest>()
+        val refreshToken = request.refreshToken?.trim()
+            ?.takeIf { Tokens.isRefreshToken(it) }
+            ?: throw ProblemException.invalidCredentials()
+
+        val result = database.transaction(DbContext.Auth()) { connection ->
+            val current = findRefreshToken(connection, refreshToken)
+                ?: throw ProblemException.invalidCredentials()
+            if (current.consumedAt != null) {
+                markRefreshReuse(connection, current.id, current.sessionId)
+                return@transaction RefreshOutcome.Reused
+            }
+
+            val now = Instant.now()
+            if (current.idleExpiresAt <= now || current.sessionRevokedAt != null ||
+                current.absoluteExpiresAt <= now || current.userStatus != "ACTIVE"
+            ) {
+                throw ProblemException.invalidCredentials()
+            }
+
+            val newRefreshId = UUID.randomUUID()
+            val accessToken = Tokens.generate(Tokens.Kind.ACCESS)
+            val newRefreshToken = Tokens.generate(Tokens.Kind.REFRESH)
+            val accessExpires = minOf(now.plus(10, ChronoUnit.MINUTES), current.absoluteExpiresAt)
+            val refreshExpires = minOf(now.plus(7, ChronoUnit.DAYS), current.absoluteExpiresAt)
+
+            val consumed = connection.prepareStatement(
+                "UPDATE app.refresh_tokens SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL",
+            ).use { statement ->
+                statement.setTimestamp(1, Timestamp.from(now))
+                statement.setObject(2, current.id)
+                statement.executeUpdate()
+            }
+            if (consumed != 1) throw ProblemException.invalidCredentials()
+
+            insertAccessToken(connection, current.sessionId, accessToken, now, accessExpires)
+            insertRefreshToken(connection, newRefreshId, current.sessionId, newRefreshToken, now, refreshExpires)
+            connection.prepareStatement("UPDATE app.refresh_tokens SET replaced_by_id = ? WHERE id = ?").use { statement ->
+                statement.setObject(1, newRefreshId)
+                statement.setObject(2, current.id)
+                statement.executeUpdate()
+            }
+
+            RefreshOutcome.Issued(
+                AuthResult(
+                    status = "AUTHENTICATED",
+                    sessionId = current.sessionId.toString(),
+                    tokens = TokenPair(
+                        accessToken = accessToken,
+                        accessTokenExpiresAt = accessExpires.toString(),
+                        refreshToken = newRefreshToken,
+                        refreshTokenExpiresAt = refreshExpires.toString(),
+                    ),
+                ),
+            )
+        }
+        when (result) {
+            is RefreshOutcome.Issued -> call.respond(result.value)
+            RefreshOutcome.Reused -> throw ProblemException.refreshReuseDetected()
+        }
+    }
+
     private fun findUser(connection: Connection, email: String): LoginUser? =
         connection.prepareStatement(
             "SELECT id, password_hash, status, email_verified_at, locked_until FROM app.users WHERE email = ?",
@@ -155,13 +221,70 @@ class LoginService(
     }
 
     private fun insertRefreshToken(connection: Connection, sessionId: UUID, token: String, issuedAt: Instant, expiresAt: Instant) {
+        insertRefreshToken(connection, UUID.randomUUID(), sessionId, token, issuedAt, expiresAt)
+    }
+
+    private fun insertRefreshToken(
+        connection: Connection,
+        refreshId: UUID,
+        sessionId: UUID,
+        token: String,
+        issuedAt: Instant,
+        expiresAt: Instant,
+    ) {
         connection.prepareStatement(
-            "INSERT INTO app.refresh_tokens (session_id, token_hash, issued_at, idle_expires_at) VALUES (?, ?, ?, ?)",
+            "INSERT INTO app.refresh_tokens (id, session_id, token_hash, issued_at, idle_expires_at) VALUES (?, ?, ?, ?, ?)",
+        ).use { statement ->
+            statement.setObject(1, refreshId)
+            statement.setObject(2, sessionId)
+            statement.setBytes(3, Tokens.sha256(token))
+            statement.setTimestamp(4, Timestamp.from(issuedAt))
+            statement.setTimestamp(5, Timestamp.from(expiresAt))
+            statement.executeUpdate()
+        }
+    }
+
+    private fun findRefreshToken(connection: Connection, token: String): RefreshRecord? =
+        connection.prepareStatement(
+            "SELECT rt.id, rt.session_id, rt.consumed_at, rt.idle_expires_at, " +
+                "s.revoked_at AS session_revoked_at, s.absolute_expires_at, u.status AS user_status " +
+                "FROM app.refresh_tokens rt " +
+                "JOIN app.sessions s ON s.id = rt.session_id " +
+                "JOIN app.users u ON u.id = s.user_id " +
+                "WHERE rt.token_hash = ? AND u.deleted_at IS NULL FOR UPDATE",
+        ).use { statement ->
+            statement.setBytes(1, Tokens.sha256(token))
+            statement.executeQuery().use { result ->
+                if (!result.next()) return null
+                RefreshRecord(
+                    id = result.getObject("id", UUID::class.java),
+                    sessionId = result.getObject("session_id", UUID::class.java),
+                    consumedAt = result.getTimestamp("consumed_at")?.toInstant(),
+                    idleExpiresAt = result.getTimestamp("idle_expires_at").toInstant(),
+                    sessionRevokedAt = result.getTimestamp("session_revoked_at")?.toInstant(),
+                    absoluteExpiresAt = result.getTimestamp("absolute_expires_at").toInstant(),
+                    userStatus = result.getString("user_status"),
+                )
+            }
+        }
+
+    private fun markRefreshReuse(connection: Connection, refreshId: UUID, sessionId: UUID) {
+        connection.prepareStatement(
+            "UPDATE app.refresh_tokens SET reuse_detected_at = COALESCE(reuse_detected_at, CURRENT_TIMESTAMP) WHERE id = ?",
+        ).use { statement ->
+            statement.setObject(1, refreshId)
+            statement.executeUpdate()
+        }
+        connection.prepareStatement(
+            "UPDATE app.sessions SET revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP), revoke_reason = 'REUSE_DETECTED' WHERE id = ?",
         ).use { statement ->
             statement.setObject(1, sessionId)
-            statement.setBytes(2, Tokens.sha256(token))
-            statement.setTimestamp(3, Timestamp.from(issuedAt))
-            statement.setTimestamp(4, Timestamp.from(expiresAt))
+            statement.executeUpdate()
+        }
+        connection.prepareStatement(
+            "UPDATE app.access_tokens SET revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP) WHERE session_id = ? AND revoked_at IS NULL",
+        ).use { statement ->
+            statement.setObject(1, sessionId)
             statement.executeUpdate()
         }
     }
@@ -173,6 +296,21 @@ class LoginService(
         val emailVerified: Boolean,
         val lockedUntil: Instant?,
     )
+
+    private data class RefreshRecord(
+        val id: UUID,
+        val sessionId: UUID,
+        val consumedAt: Instant?,
+        val idleExpiresAt: Instant,
+        val sessionRevokedAt: Instant?,
+        val absoluteExpiresAt: Instant,
+        val userStatus: String,
+    )
+
+    private sealed interface RefreshOutcome {
+        data class Issued(val value: AuthResult) : RefreshOutcome
+        data object Reused : RefreshOutcome
+    }
 
     private val dummyPasswordHash: String by lazy {
         val dummy = "vrtic-login-dummy-password".toCharArray()
