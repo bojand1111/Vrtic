@@ -21,6 +21,11 @@ object Tokens {
         return kind.prefix + encoder.encodeToString(bytes)
     }
 
+    fun isAccessToken(token: String): Boolean =
+        token.length == Kind.ACCESS.prefix.length + 43 &&
+            token.startsWith(Kind.ACCESS.prefix) &&
+            token.drop(Kind.ACCESS.prefix.length).all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '-' || it == '_' }
+
     fun sha256(token: String): ByteArray =
         MessageDigest.getInstance("SHA-256").digest(token.toByteArray(Charsets.US_ASCII))
 

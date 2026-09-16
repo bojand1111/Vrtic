@@ -50,5 +50,7 @@ class Argon2idPasswordHasherTest {
         assertEquals(32, Tokens.sha256(a).size)
         assertTrue(Tokens.sha256(a).contentEquals(Tokens.sha256(a)))
         assertFalse(Tokens.redact(a).contains(a.substring(6, 30)))
+        assertTrue(Tokens.isAccessToken(Tokens.generate(Tokens.Kind.ACCESS)))
+        assertFalse(Tokens.isAccessToken(a))
     }
 }

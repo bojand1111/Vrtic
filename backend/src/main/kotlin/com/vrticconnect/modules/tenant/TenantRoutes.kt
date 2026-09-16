@@ -14,13 +14,14 @@ import io.ktor.server.routing.route
  *   2. resolve ACTIVE membership of the user in {organizationId} -> 404 if none (never reveal the org)
  *   3. open a DB transaction with DbContext.Tenant(organizationId, userId) -> RLS applies
  *   4. resource-level policy (group assignment, guardian link, extra permission)
- * Only step 1 exists in the skeleton, so every route here answers 401.
+ * Step 1 is implemented for bearer access tokens; membership and resource handling remain
+ * intentionally unavailable until the following EPIC 02/03 tasks.
  */
 fun Route.tenantRoutes(sessionResolver: SessionResolver) {
     route("/organizations/{organizationId}") {
         get("/ping") {
             requireUser(sessionResolver)
-            // Unreachable until EPIC 02: kept as the canonical example of the protected pipeline.
+            // The resolver is live; the tenant pipeline itself is implemented in a later task.
             throw ProblemException.notImplemented("Tenant pipeline")
         }
     }

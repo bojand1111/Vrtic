@@ -14,7 +14,7 @@ import io.ktor.server.routing.route
  */
 fun Route.authRoutes(sessionResolver: SessionResolver) {
     route("/auth") {
-        // Current session (web bootstrap). 401 until EPIC 02 implements sessions.
+        // Current session is still a 501 stub after credentials are resolved.
         get("/session") {
             requireUser(sessionResolver)
             throw ProblemException.notImplemented("Session info")

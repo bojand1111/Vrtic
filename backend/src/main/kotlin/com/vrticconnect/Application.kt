@@ -2,6 +2,7 @@ package com.vrticconnect
 
 import com.vrticconnect.config.AppConfig
 import com.vrticconnect.db.Database
+import com.vrticconnect.modules.auth.DatabaseSessionResolver
 import com.vrticconnect.modules.auth.NotImplementedSessionResolver
 import com.vrticconnect.modules.auth.SessionResolver
 import com.vrticconnect.modules.auth.authRoutes
@@ -25,8 +26,8 @@ class AppDependencies(
     val config: AppConfig,
     val database: Database?,
     val readiness: ReadinessProbe,
-    /** Resolves an access token into an authenticated principal. Until EPIC 02 it rejects everything. */
-    val sessionResolver: SessionResolver = NotImplementedSessionResolver,
+    /** Resolves an access token into an authenticated principal. */
+    val sessionResolver: SessionResolver = database?.let(::DatabaseSessionResolver) ?: NotImplementedSessionResolver,
 )
 
 fun Application.module(deps: AppDependencies) {
