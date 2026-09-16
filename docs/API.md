@@ -30,7 +30,7 @@ Sadržaj:
 
 | | Web admin (React SPA) | Mobile (KMP) |
 |---|---|---|
-| Security scheme | `cookieAuth` (`vc_session` kolačić: HttpOnly, Secure, SameSite=Lax) | `bearerAuth` (`Authorization: Bearer <opaque access token>`) |
+| Security scheme | `cookieAuth` (`vc_access` kolačić: HttpOnly, Secure, SameSite=Lax; `vc_refresh` samo za refresh putanju) | `bearerAuth` (`Authorization: Bearer <opaque access token>`) |
 | Gde žive tokeni | samo u HttpOnly kolačićima, **nikad** u `localStorage` | Keychain / Keystore; nikad u preferences ni u logovima |
 | Refresh | `POST /auth/refresh` bez tela (HttpOnly `vc_refresh` kolačić) | `POST /auth/refresh` sa `refreshToken` u telu, single-flight |
 | CSRF | obavezan `X-CSRF-Token` + tačna provera `Origin` na svakom mutirajućem zahtevu | nije primenljivo |
@@ -488,7 +488,7 @@ X-Request-Id: 01J8Q3ZA0X…
 }
 ```
 
-Za OWNER-a sa MFA odgovor je `{"status":"MFA_REQUIRED","mfaChallengeToken":"vcm_…"}` → `POST /auth/mfa/totp/verify {"mfaChallengeToken":"vcm_…","code":"123456"}` vraća isti `AuthResult` sa tokenima. Web varijanta: telo ima `tokens: null`, `csrfToken: "c9…"`, a `Set-Cookie: vc_session=…; HttpOnly; Secure; SameSite=Lax`.
+Za OWNER-a sa MFA odgovor je `{"status":"MFA_REQUIRED","mfaChallengeToken":"vcm_…"}` → `POST /auth/mfa/totp/verify {"mfaChallengeToken":"vcm_…","code":"123456"}` vraća isti `AuthResult` sa tokenima. Web varijanta: telo ima `tokens: null`, `csrfToken: "c9…"`, a `Set-Cookie: vc_access=…; HttpOnly; Secure; SameSite=Lax` i `vc_refresh` kolačić za refresh.
 
 ```http
 POST /api/v1/auth/refresh
@@ -683,7 +683,7 @@ Invarijanta: `expected = present + departed + absent + notArrived` (12 = 8 + 1 +
 
 ```http
 POST /api/v1/organizations/6f2b…/children/9c1d…/guardians/invite
-Cookie: vc_session=…
+Cookie: vc_access=…
 X-CSRF-Token: c9…
 Idempotency-Key: 8f3c7a10-2c4e-4c2b-9a77-0d2b0c6a1e55
 Content-Type: application/json
@@ -704,7 +704,7 @@ Tok: roditelj otvara link → `GET /auth/invitations/{token}` → `POST /auth/re
 
 ```http
 POST /api/v1/organizations/6f2b…/guardians/gu-4…/confirm
-Cookie: vc_session=…
+Cookie: vc_access=…
 X-CSRF-Token: c9…
 
 HTTP/1.1 200 OK

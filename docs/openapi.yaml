@@ -8754,7 +8754,7 @@ components:
     cookieAuth:
       type: apiKey
       in: cookie
-      name: vc_session
+      name: vc_access
       description: >-
         Web admin session cookie (HttpOnly, Secure, SameSite=Lax). Mutating requests must also send `X-CSRF-Token` and an exact `Origin`
         matching the configured web origin. Tokens are never stored in localStorage.
