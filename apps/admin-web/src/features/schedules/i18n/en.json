@@ -1,0 +1,59 @@
+{
+  "weekday": {
+    "1": "Monday",
+    "2": "Tuesday",
+    "3": "Wednesday",
+    "4": "Thursday",
+    "5": "Friday",
+    "6": "Saturday",
+    "7": "Sunday"
+  },
+  "fromDate": "from {{from}}",
+  "period": "from {{from}} to {{to}}",
+  "openingHours": "Opening hours: {{opens}} to {{closes}}",
+  "noTemplate": "No weekly schedule yet.",
+  "current": "Current schedule",
+  "upcoming": "Upcoming schedule",
+  "change": "Change schedule",
+  "previous": "Previous schedules",
+  "notAttending": "not attending",
+  "day": "Day",
+  "attends": "Attends",
+  "arrival": "Arrival",
+  "departure": "Departure",
+  "effectiveFrom": "Valid from",
+  "effectiveFromHint": "The previous schedule applies until the day before this date. Past days are never changed.",
+  "save": "Save schedule",
+  "errors": {
+    "notWorkingDay": "The kindergarten is closed on this day.",
+    "timeRequired": "Enter arrival and departure times.",
+    "outsideHours": "Outside opening hours ({{opens}} to {{closes}}).",
+    "departureBeforeArrival": "Departure must be after arrival."
+  },
+  "week": "Week from {{from}} to {{to}}",
+  "prevWeek": "Previous week",
+  "thisWeek": "This week",
+  "nextWeek": "Next week",
+  "source": {
+    "ABSENCE": "Absence",
+    "TEMPLATE": "By schedule",
+    "NONE": "Not planned"
+  },
+  "notExpected": "not expected",
+  "group": "Group",
+  "noGroups": "No groups available",
+  "expectedCount": "{{expected}} of {{total}} children expected.",
+  "nonWorkingDay": "The kindergarten is closed on this day.",
+  "noChildrenInGroup": "No children are enrolled in the group on the selected date.",
+  "expected": "Expected",
+  "note": "Note",
+  "noTemplateShort": "no schedule",
+  "absenceKind": {
+    "SICK": "Sick",
+    "VACATION": "Vacation",
+    "OTHER": "Other absence"
+  },
+  "noLinkedChildren": "No children are linked to your account yet.",
+  "child": "Child",
+  "readOnlyHint": "You can view this schedule but are not allowed to change it."
+}

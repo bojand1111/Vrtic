@@ -1,0 +1,32 @@
+{
+  "greeting": "Welcome, {{name}}.",
+  "noOrganization": "This account is not a member of any kindergarten yet.",
+  "attendanceToday": "Attendance for the selected day",
+  "organization": "Organization",
+  "counters": {
+    "expected": "Expected",
+    "present": "Present",
+    "departed": "Departed",
+    "absent": "Absent",
+    "notArrived": "Not arrived",
+    "late": "Late",
+    "unscheduledPresent": "Unscheduled"
+  },
+  "childrenActive": "Enrolled children",
+  "staffActive": "Staff",
+  "absencesToday": "Absences today",
+  "guardiansPending": "Parent links to confirm",
+  "invitationsPending": "Pending invitations",
+  "byGroup": "By group",
+  "group": "Group",
+  "latestAnnouncements": "Latest announcements",
+  "upcomingEvents": "Upcoming events",
+  "myGroups": "My groups",
+  "myChildren": "My children",
+  "todayMenu": "Today's menu",
+  "openAttendance": "Open attendance",
+  "openChild": "Details",
+  "reportAbsence": "Report absence",
+  "noMenu": "Today's menu has not been published.",
+  "unread": "unread"
+}

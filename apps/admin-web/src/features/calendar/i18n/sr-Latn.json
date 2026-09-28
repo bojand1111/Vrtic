@@ -1,0 +1,34 @@
+{
+  "new": "Novi događaj",
+  "edit": "Izmena događaja",
+  "fields": {
+    "kind": "Vrsta",
+    "title": "Naziv",
+    "description": "Opis",
+    "allDay": "Ceo dan",
+    "startTime": "Početak",
+    "endTime": "Kraj",
+    "location": "Objekat",
+    "group": "Grupa"
+  },
+  "kinds": {
+    "TRIP": "Izlet",
+    "PHOTO_DAY": "Fotografisanje",
+    "PERFORMANCE": "Priredba",
+    "HOLIDAY": "Praznik",
+    "PARENT_MEETING": "Roditeljski sastanak",
+    "CLOSURE": "Vrtić ne radi",
+    "OTHER": "Ostalo"
+  },
+  "wholeOrganization": "Ceo vrtić",
+  "noGroup": "Bez grupe",
+  "scope": {
+    "group": "Grupa",
+    "location": "Objekat"
+  },
+  "allDay": "Ceo dan",
+  "previousMonth": "Prethodni mesec",
+  "nextMonth": "Sledeći mesec",
+  "today": "Danas",
+  "empty": "Nema događaja u ovom mesecu."
+}

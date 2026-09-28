@@ -1,0 +1,23 @@
+{
+  "editDay": "Jelovnik",
+  "slots": {
+    "BREAKFAST": "Doručak",
+    "SNACK_AM": "Užina (pre podne)",
+    "LUNCH": "Ručak",
+    "SNACK_PM": "Užina (po podne)"
+  },
+  "allergens": "Alergeni",
+  "allergensPlaceholder": "npr. GLUTEN, MLEKO",
+  "allergensHint": "Alergene odvojite zarezom; čuvaju se kao oznake velikim slovima bez kvačica (GLUTEN, MLEKO, JAJA).",
+  "previousWeek": "Prethodna nedelja",
+  "nextWeek": "Sledeća nedelja",
+  "thisWeek": "Ova nedelja",
+  "noMenu": "Jelovnik nije unet.",
+  "published": "Objavljeno",
+  "draft": "Nije objavljeno",
+  "locationMenu": "Jelovnik objekta",
+  "empty": "Nema",
+  "add": "Unesi jelovnik",
+  "publish": "Objavi",
+  "disclaimer": "Oznake alergena su informativne i nisu medicinski savet."
+}

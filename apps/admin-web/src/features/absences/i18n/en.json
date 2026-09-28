@@ -1,0 +1,25 @@
+{
+  "report": "Report absence",
+  "submit": "Report",
+  "teacherHint": "Overview of absences in your groups, for planning.",
+  "group": "Group",
+  "allGroups": "All groups",
+  "child": "Child",
+  "allChildren": "All children",
+  "selectChild": "Select a child",
+  "kind": "Kind",
+  "allKinds": "All kinds",
+  "kinds": {
+    "SICK": "Sick",
+    "VACATION": "Vacation",
+    "OTHER": "Other"
+  },
+  "status": {
+    "ACTIVE": "Active",
+    "CANCELLED": "Cancelled"
+  },
+  "empty": "No absences in the selected period.",
+  "cancel": "Cancel absence",
+  "confirmCancel": "Cancel this absence?",
+  "noteHint": "No medical justification is needed."
+}

@@ -1,0 +1,44 @@
+.vc-meals-week {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.vc-meals-day h3 {
+  text-transform: capitalize;
+}
+
+.vc-meals-menu + .vc-meals-menu {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--vc-border);
+}
+
+.vc-meals-slots {
+  margin: 8px 0 0;
+}
+
+.vc-meals-slots dt {
+  font-size: 0.85rem;
+  color: var(--vc-muted);
+  margin-top: 6px;
+}
+
+.vc-meals-slots dd {
+  margin: 0;
+}
+
+.vc-meals-item {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-right: 6px;
+}
+
+.vc-meals-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+}

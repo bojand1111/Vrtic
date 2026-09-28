@@ -1,0 +1,14 @@
+{
+  "add": "Add location",
+  "edit": "Edit location",
+  "empty": "No locations.",
+  "address": "Address",
+  "addressLine": "Street and number",
+  "postalCode": "Postal code",
+  "city": "City",
+  "phone": "Phone",
+  "activeGroups": "Active groups",
+  "deactivate": "Deactivate",
+  "activate": "Activate",
+  "confirmDelete": "Delete location \"{{name}}\"?"
+}

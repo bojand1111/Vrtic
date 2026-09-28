@@ -30,10 +30,16 @@ export function logout(): Promise<void> {
 /**
  * GET /api/v1/auth/session - describes the current cookie session for the SPA bootstrap.
  */
-export function getSession(signal?: AbortSignal): Promise<SessionResponse> {
-  return apiFetch<SessionResponse>('/api/v1/auth/session', {
+export async function getSession(signal?: AbortSignal): Promise<SessionResponse> {
+  const response = await apiFetch<SessionResponse>('/api/v1/auth/session', {
     method: 'GET',
     signal,
     skipUnauthorizedHandler: true,
   });
+  // The session endpoint names the OWNER membership role 'KINDERGARTEN_OWNER' (PRODUCT_SPEC role name);
+  // every other endpoint and the permission matrix use the membership value 'OWNER'.
+  const memberships = response.user.memberships.map((m) =>
+    (m.role as string) === 'KINDERGARTEN_OWNER' ? { ...m, role: 'OWNER' as const } : m,
+  );
+  return { user: { ...response.user, memberships } };
 }

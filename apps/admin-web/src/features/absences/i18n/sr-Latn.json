@@ -1,0 +1,25 @@
+{
+  "report": "Prijavi odsustvo",
+  "submit": "Prijavi",
+  "teacherHint": "Pregled odsustava dece iz vaših grupa, za planiranje.",
+  "group": "Grupa",
+  "allGroups": "Sve grupe",
+  "child": "Dete",
+  "allChildren": "Sva deca",
+  "selectChild": "Izaberite dete",
+  "kind": "Vrsta",
+  "allKinds": "Sve vrste",
+  "kinds": {
+    "SICK": "Bolest",
+    "VACATION": "Odmor",
+    "OTHER": "Drugo"
+  },
+  "status": {
+    "ACTIVE": "Aktivno",
+    "CANCELLED": "Otkazano"
+  },
+  "empty": "Nema odsustava u izabranom periodu.",
+  "cancel": "Otkaži odsustvo",
+  "confirmCancel": "Otkazati ovo odsustvo?",
+  "noteHint": "Nije potrebno medicinsko obrazloženje."
+}

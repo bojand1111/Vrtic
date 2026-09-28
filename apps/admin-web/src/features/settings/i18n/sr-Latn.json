@@ -1,0 +1,21 @@
+{
+  "readOnly": "Podešavanja može da menja samo vlasnik organizacije.",
+  "dayOpensAt": "Vrtić se otvara u",
+  "dayClosesAt": "Vrtić se zatvara u",
+  "workingWeekdays": "Radni dani",
+  "weekdays": {
+    "1": "Ponedeljak",
+    "2": "Utorak",
+    "3": "Sreda",
+    "4": "Četvrtak",
+    "5": "Petak",
+    "6": "Subota",
+    "7": "Nedelja"
+  },
+  "scheduleChangeDeadlineHours": "Rok za izmenu rasporeda (sati)",
+  "scheduleChangeDeadlineHint": "Koliko sati unapred roditelj može da menja dolazak ili odlazak (0 do 168).",
+  "lateArrivalGraceMinutes": "Tolerancija kašnjenja (minuti)",
+  "lateArrivalGraceHint": "Posle koliko minuta se dolazak smatra kašnjenjem (0 do 180).",
+  "offlineCacheTtlHours": "Trajanje offline keša (sati)",
+  "offlineCacheTtlHint": "Koliko dugo mobilna aplikacija čuva podatke bez veze (1 do 48)."
+}

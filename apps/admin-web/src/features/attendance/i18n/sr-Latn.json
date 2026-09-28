@@ -1,0 +1,64 @@
+{
+  "group": "Grupa",
+  "noGroups": "Nemate dostupnih grupa.",
+  "noChildren": "U ovoj grupi tog dana nema upisane dece.",
+  "pastDateHint": "Dolazak i odlazak se evidentiraju samo za današnji dan; za ranije dane koristite korekciju.",
+  "counters": {
+    "expected": "Očekivano",
+    "present": "Prisutno",
+    "departed": "Otišlo",
+    "absent": "Odsutno",
+    "notArrived": "Nije stiglo",
+    "late": "Kasni",
+    "unscheduledPresent": "Neplanirano prisutno"
+  },
+  "columns": {
+    "child": "Dete",
+    "expected": "Očekivano vreme",
+    "arrival": "Dolazak",
+    "departure": "Odlazak"
+  },
+  "status": {
+    "NOT_ARRIVED": "Nije stiglo",
+    "CHECKED_IN": "U vrtiću",
+    "CHECKED_OUT": "Otišlo"
+  },
+  "absence": {
+    "SICK": "Bolest",
+    "VACATION": "Odmor",
+    "OTHER": "Drugo"
+  },
+  "late": "Kasni",
+  "unscheduled": "Neplanirano",
+  "notExpected": "Ne očekuje se",
+  "actions": {
+    "checkIn": "Dolazak",
+    "checkOut": "Odlazak",
+    "markAbsent": "Odsutno",
+    "clearAbsence": "Poništi odsustvo",
+    "correct": "Korekcija"
+  },
+  "absentModal": {
+    "title": "Označi odsustvo",
+    "kind": "Vrsta odsustva"
+  },
+  "correction": {
+    "title": "Korekcija prisustva",
+    "event": "Događaj",
+    "eventCheckIn": "Dolazak u {{time}} (poseta {{n}})",
+    "eventCheckOut": "Odlazak u {{time}} (poseta {{n}})",
+    "mode": "Vrsta korekcije",
+    "retime": "Promeni vreme",
+    "void": "Poništi događaj",
+    "newTime": "Novo vreme",
+    "reason": "Razlog",
+    "reasonHint": "Obavezno, najmanje 3 znaka.",
+    "noEvents": "Za ovaj dan nema dolazaka ni odlazaka za korekciju.",
+    "submit": "Sačuvaj korekciju"
+  },
+  "parent": {
+    "noChildren": "Nemate povezanu decu.",
+    "expectedTimes": "Očekivano: {{from}} – {{to}}",
+    "noVisits": "Za ovaj dan nema zabeleženih dolazaka."
+  }
+}

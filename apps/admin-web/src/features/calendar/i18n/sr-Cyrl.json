@@ -1,0 +1,34 @@
+{
+  "new": "Нови догађај",
+  "edit": "Измена догађаја",
+  "fields": {
+    "kind": "Врста",
+    "title": "Назив",
+    "description": "Опис",
+    "allDay": "Цео дан",
+    "startTime": "Почетак",
+    "endTime": "Крај",
+    "location": "Објекат",
+    "group": "Група"
+  },
+  "kinds": {
+    "TRIP": "Излет",
+    "PHOTO_DAY": "Фотографисање",
+    "PERFORMANCE": "Приредба",
+    "HOLIDAY": "Празник",
+    "PARENT_MEETING": "Родитељски састанак",
+    "CLOSURE": "Вртић не ради",
+    "OTHER": "Остало"
+  },
+  "wholeOrganization": "Цео вртић",
+  "noGroup": "Без групе",
+  "scope": {
+    "group": "Група",
+    "location": "Објекат"
+  },
+  "allDay": "Цео дан",
+  "previousMonth": "Претходни месец",
+  "nextMonth": "Следећи месец",
+  "today": "Данас",
+  "empty": "Нема догађаја у овом месецу."
+}

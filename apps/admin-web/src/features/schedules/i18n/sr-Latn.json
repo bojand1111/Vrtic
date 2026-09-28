@@ -1,0 +1,59 @@
+{
+  "weekday": {
+    "1": "Ponedeljak",
+    "2": "Utorak",
+    "3": "Sreda",
+    "4": "Četvrtak",
+    "5": "Petak",
+    "6": "Subota",
+    "7": "Nedelja"
+  },
+  "fromDate": "od {{from}}",
+  "period": "od {{from}} do {{to}}",
+  "openingHours": "Radno vreme vrtića: {{opens}} do {{closes}}",
+  "noTemplate": "Nedeljni raspored još nije unet.",
+  "current": "Važeći raspored",
+  "upcoming": "Budući raspored",
+  "change": "Promeni raspored",
+  "previous": "Prethodni rasporedi",
+  "notAttending": "ne dolazi",
+  "day": "Dan",
+  "attends": "Dolazi",
+  "arrival": "Dolazak",
+  "departure": "Odlazak",
+  "effectiveFrom": "Važi od",
+  "effectiveFromHint": "Prethodni raspored važi do dana pre ovog datuma. Prošli dani se ne menjaju.",
+  "save": "Sačuvaj raspored",
+  "errors": {
+    "notWorkingDay": "Vrtić ne radi tog dana.",
+    "timeRequired": "Unesite vreme dolaska i odlaska.",
+    "outsideHours": "Van radnog vremena ({{opens}} do {{closes}}).",
+    "departureBeforeArrival": "Odlazak mora biti posle dolaska."
+  },
+  "week": "Nedelja od {{from}} do {{to}}",
+  "prevWeek": "Prethodna nedelja",
+  "thisWeek": "Ova nedelja",
+  "nextWeek": "Sledeća nedelja",
+  "source": {
+    "ABSENCE": "Odsustvo",
+    "TEMPLATE": "Po rasporedu",
+    "NONE": "Nije planirano"
+  },
+  "notExpected": "ne dolazi",
+  "group": "Grupa",
+  "noGroups": "Nema dostupnih grupa",
+  "expectedCount": "Očekuje se {{expected}} od {{total}} dece.",
+  "nonWorkingDay": "Vrtić ne radi tog dana.",
+  "noChildrenInGroup": "U grupi nema upisane dece na izabrani datum.",
+  "expected": "Očekuje se",
+  "note": "Napomena",
+  "noTemplateShort": "nema rasporeda",
+  "absenceKind": {
+    "SICK": "Bolest",
+    "VACATION": "Odmor",
+    "OTHER": "Drugo odsustvo"
+  },
+  "noLinkedChildren": "Za vaš nalog još nije povezano nijedno dete.",
+  "child": "Dete",
+  "readOnlyHint": "Raspored možete da pregledate, ali nemate pravo da ga menjate."
+}

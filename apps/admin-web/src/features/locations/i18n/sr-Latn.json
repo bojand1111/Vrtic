@@ -1,0 +1,14 @@
+{
+  "add": "Dodaj lokaciju",
+  "edit": "Izmena lokacije",
+  "empty": "Nema lokacija.",
+  "address": "Adresa",
+  "addressLine": "Ulica i broj",
+  "postalCode": "Poštanski broj",
+  "city": "Grad",
+  "phone": "Telefon",
+  "activeGroups": "Aktivne grupe",
+  "deactivate": "Deaktiviraj",
+  "activate": "Aktiviraj",
+  "confirmDelete": "Obrisati lokaciju „{{name}}“?"
+}

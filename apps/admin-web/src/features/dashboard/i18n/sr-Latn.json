@@ -1,0 +1,32 @@
+{
+  "greeting": "Dobro došli, {{name}}.",
+  "noOrganization": "Nalog još nije član nijednog vrtića.",
+  "attendanceToday": "Prisustvo za izabrani dan",
+  "organization": "Organizacija",
+  "counters": {
+    "expected": "Očekivano",
+    "present": "Prisutno",
+    "departed": "Otišlo",
+    "absent": "Odsutno",
+    "notArrived": "Nije stiglo",
+    "late": "Kasni",
+    "unscheduledPresent": "Van rasporeda"
+  },
+  "childrenActive": "Upisane dece",
+  "staffActive": "Zaposlenih",
+  "absencesToday": "Odsustva danas",
+  "guardiansPending": "Veze roditelja za potvrdu",
+  "invitationsPending": "Pozivnice na čekanju",
+  "byGroup": "Po grupama",
+  "group": "Grupa",
+  "latestAnnouncements": "Najnovija obaveštenja",
+  "upcomingEvents": "Predstojeći događaji",
+  "myGroups": "Moje grupe",
+  "myChildren": "Moja deca",
+  "todayMenu": "Današnji jelovnik",
+  "openAttendance": "Otvori prisustvo",
+  "openChild": "Detalji",
+  "reportAbsence": "Prijavi odsustvo",
+  "noMenu": "Jelovnik za danas nije objavljen.",
+  "unread": "nepročitano"
+}

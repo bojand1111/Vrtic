@@ -1,0 +1,21 @@
+{
+  "inviteHint": "Invite new parents from the Employees screen (Invitations). Here you link them to children and confirm links.",
+  "empty": "No parent accounts.",
+  "parent": "Parent",
+  "email": "E-mail",
+  "account": "Account",
+  "children": "Children",
+  "membershipStatus": {
+    "INVITED": "Invited",
+    "ACTIVE": "Active",
+    "SUSPENDED": "Suspended",
+    "REVOKED": "Revoked"
+  },
+  "noLinks": "Not linked to any child",
+  "linkChild": "Link to child",
+  "byChild": "Parents by child",
+  "child": "Child",
+  "others": "Others (guardian, grandparent...)",
+  "linkParent": "Link parent",
+  "accounts": "Parent accounts"
+}

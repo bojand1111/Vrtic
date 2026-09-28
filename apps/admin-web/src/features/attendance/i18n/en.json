@@ -1,0 +1,64 @@
+{
+  "group": "Group",
+  "noGroups": "No groups available to you.",
+  "noChildren": "No children are enrolled in this group on that day.",
+  "pastDateHint": "Arrivals and departures are recorded for today only; use a correction for earlier days.",
+  "counters": {
+    "expected": "Expected",
+    "present": "Present",
+    "departed": "Departed",
+    "absent": "Absent",
+    "notArrived": "Not arrived",
+    "late": "Late",
+    "unscheduledPresent": "Unscheduled present"
+  },
+  "columns": {
+    "child": "Child",
+    "expected": "Expected time",
+    "arrival": "Arrival",
+    "departure": "Departure"
+  },
+  "status": {
+    "NOT_ARRIVED": "Not arrived",
+    "CHECKED_IN": "In kindergarten",
+    "CHECKED_OUT": "Left"
+  },
+  "absence": {
+    "SICK": "Sick",
+    "VACATION": "Vacation",
+    "OTHER": "Other"
+  },
+  "late": "Late",
+  "unscheduled": "Unscheduled",
+  "notExpected": "Not expected",
+  "actions": {
+    "checkIn": "Arrival",
+    "checkOut": "Departure",
+    "markAbsent": "Absent",
+    "clearAbsence": "Clear absence",
+    "correct": "Correction"
+  },
+  "absentModal": {
+    "title": "Mark absence",
+    "kind": "Absence type"
+  },
+  "correction": {
+    "title": "Attendance correction",
+    "event": "Event",
+    "eventCheckIn": "Arrival at {{time}} (visit {{n}})",
+    "eventCheckOut": "Departure at {{time}} (visit {{n}})",
+    "mode": "Correction type",
+    "retime": "Change time",
+    "void": "Void event",
+    "newTime": "New time",
+    "reason": "Reason",
+    "reasonHint": "Required, at least 3 characters.",
+    "noEvents": "There are no arrivals or departures to correct on this day.",
+    "submit": "Save correction"
+  },
+  "parent": {
+    "noChildren": "No children are linked to you.",
+    "expectedTimes": "Expected: {{from}} – {{to}}",
+    "noVisits": "No arrivals recorded for this day."
+  }
+}

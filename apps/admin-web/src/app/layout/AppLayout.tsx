@@ -3,17 +3,19 @@ import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet } from 'react-router';
 
 import { logout } from '../../api/auth';
+import { useOrg } from '../../api/org';
 import { useSession } from '../../auth/useSession';
 import { TenantSwitcher } from '../../tenant/TenantSwitcher';
 import { useTenant } from '../../tenant/useTenant';
-import { FEATURES } from '../navigation';
+import { FEATURES, isFeatureVisible } from '../navigation';
 import { HealthWidget } from './HealthWidget';
 import { LocaleSwitcher } from './LocaleSwitcher';
 
 export function AppLayout() {
   const { t } = useTranslation();
   const { state, markUnauthenticated } = useSession();
-  const { organizationId } = useTenant();
+  const { organizationId, isPlatformAdmin } = useTenant();
+  const { can, role } = useOrg();
   const queryClient = useQueryClient();
 
   const logoutMutation = useMutation({
@@ -40,7 +42,12 @@ export function AppLayout() {
         <div className="vc-header-tools">
           <TenantSwitcher />
           <LocaleSwitcher />
-          {email.length > 0 ? <span>{email}</span> : null}
+          {email.length > 0 ? (
+            <span>
+              {email}
+              {role === null ? null : ` · ${t(`roles.${role}`)}`}
+            </span>
+          ) : null}
           <button
             type="button"
             className="vc-button"
@@ -56,7 +63,7 @@ export function AppLayout() {
 
       <nav className="vc-nav" aria-label={t('nav.label')}>
         <ul>
-          {FEATURES.map((feature) => (
+          {FEATURES.filter((feature) => isFeatureVisible(feature, can, isPlatformAdmin)).map((feature) => (
             <li key={feature.key}>
               <NavLink to={feature.path} end={feature.path === '/'}>
                 {t(`nav.${feature.key}`)}

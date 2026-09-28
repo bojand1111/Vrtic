@@ -1,0 +1,49 @@
+{
+  "tabs": {
+    "staff": "Запослени",
+    "members": "Чланови",
+    "invitations": "Позивнице"
+  },
+  "status": {
+    "INVITED": "Позван",
+    "ACTIVE": "Активан",
+    "SUSPENDED": "Суспендован",
+    "REVOKED": "Опозван"
+  },
+  "invitationStatus": {
+    "PENDING": "На чекању",
+    "ACCEPTED": "Прихваћена",
+    "EXPIRED": "Истекла",
+    "REVOKED": "Опозвана"
+  },
+  "email": "Е-пошта",
+  "role": "Улога",
+  "jobTitle": "Радно место",
+  "phone": "Телефон",
+  "primaryLocation": "Матична локација",
+  "groups": "Групе",
+  "startedAt": "Почетак рада",
+  "endedAt": "Крај рада",
+  "displayName": "Име за приказ",
+  "editProfile": "Измена профила запосленог",
+  "staffEmpty": "Нема профила запослених.",
+  "membersEmpty": "Нема чланова са изабраним филтером.",
+  "children": "Деца",
+  "createProfile": "Направи профил запосленог",
+  "revoke": "Опозови",
+  "revokeTitle": "Опозив чланства: {{name}}",
+  "revokeExplain": "Опозивом члан губи приступ вртићу одмах. Задужења у групама се завршавају, а везе родитеља са децом се опозивају.",
+  "revokeReason": "Разлог (најмање 3 знака)",
+  "yourPassword": "Ваша лозинка",
+  "passwordHint": "Ради безбедности потврдите ову радњу својом лозинком.",
+  "invite": "Позови",
+  "sendInvitation": "Пошаљи позивницу",
+  "child": "Дете",
+  "chooseChild": "Изаберите дете",
+  "sentAt": "Послата",
+  "expiresAt": "Истиче",
+  "invitationsEmpty": "Нема позивница са изабраним статусом.",
+  "confirmRevokeInvitation": "Опозвати позивницу за {{email}}?",
+  "invitationSent": "Позивница је послата на {{email}}.",
+  "devMailInfo": "У развојном окружењу се е-пошта не шаље: линк позивнице се исписује у логу API прозора (DEV MAIL)."
+}

@@ -1,0 +1,18 @@
+.vc-calendar-month {
+  min-width: 160px;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.vc-calendar-event {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.vc-calendar-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 6px;
+}

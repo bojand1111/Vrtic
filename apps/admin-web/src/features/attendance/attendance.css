@@ -1,0 +1,14 @@
+.vc-attendance-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.vc-attendance-children {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.vc-table td.vc-actions .vc-button--primary {
+  min-width: 96px;
+  min-height: 40px;
+}

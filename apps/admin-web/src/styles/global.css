@@ -353,3 +353,250 @@ body {
   max-width: 640px;
   margin: 0 auto;
 }
+
+/* ---------------------------------------------------------------- business screens (EPIC 03+) */
+.vc-page-header--actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.vc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+}
+
+.vc-toolbar .vc-field {
+  margin-bottom: 0;
+}
+
+.vc-muted {
+  color: var(--vc-muted);
+}
+
+.vc-section {
+  margin: 0 0 24px;
+  padding: 16px;
+  background: var(--vc-surface);
+  border: 1px solid var(--vc-border);
+  border-radius: var(--vc-radius);
+}
+
+.vc-section h2 {
+  margin: 0 0 12px;
+  font-size: 1.15rem;
+}
+
+.vc-table-wrap {
+  overflow-x: auto;
+  background: var(--vc-surface);
+  border: 1px solid var(--vc-border);
+  border-radius: var(--vc-radius);
+  margin-bottom: 20px;
+}
+
+.vc-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.vc-table th,
+.vc-table td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vc-border);
+  vertical-align: middle;
+}
+
+.vc-table th {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--vc-muted);
+}
+
+.vc-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.vc-table td.vc-actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.vc-table td.vc-actions .vc-button + .vc-button {
+  margin-left: 6px;
+}
+
+.vc-button--small {
+  padding: 4px 10px;
+  font-size: 0.9rem;
+}
+
+.vc-button--danger {
+  color: var(--vc-danger);
+  border-color: var(--vc-danger-border);
+}
+
+.vc-button--ghost {
+  border-color: transparent;
+  background: transparent;
+}
+
+.vc-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid var(--vc-border);
+  white-space: nowrap;
+}
+
+.vc-badge--success {
+  color: var(--vc-success);
+  border-color: color-mix(in srgb, var(--vc-success) 45%, transparent);
+}
+
+.vc-badge--warning {
+  color: #b54708;
+  border-color: #f5c27a;
+}
+
+.vc-badge--danger {
+  color: var(--vc-danger);
+  border-color: var(--vc-danger-border);
+}
+
+.vc-badge--info {
+  color: var(--vc-primary);
+  border-color: var(--vc-info-border);
+}
+
+.vc-field textarea {
+  font: inherit;
+  padding: 8px 10px;
+  border: 1px solid var(--vc-border);
+  border-radius: var(--vc-radius);
+  background: var(--vc-surface);
+  color: var(--vc-text);
+  resize: vertical;
+}
+
+.vc-field-hint {
+  color: var(--vc-muted);
+}
+
+.vc-field--checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.vc-field--checkbox label {
+  font-weight: 400;
+}
+
+.vc-field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0 16px;
+}
+
+.vc-modal {
+  width: min(640px, 100vw - 24px);
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border: 1px solid var(--vc-border);
+  border-radius: var(--vc-radius);
+  background: var(--vc-surface);
+  color: var(--vc-text);
+}
+
+.vc-modal::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.vc-modal-body {
+  padding: 20px;
+}
+
+.vc-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.vc-modal-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.vc-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.vc-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.vc-card {
+  padding: 16px;
+  background: var(--vc-surface);
+  border: 1px solid var(--vc-border);
+  border-radius: var(--vc-radius);
+}
+
+.vc-card h3 {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  color: var(--vc-muted);
+  font-weight: 600;
+}
+
+.vc-card .vc-stat {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.vc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.vc-list > li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--vc-border);
+}
+
+.vc-list > li:last-child {
+  border-bottom: 0;
+}
+
+.vc-pre {
+  white-space: pre-wrap;
+  margin: 8px 0 0;
+}
+
+a.vc-card {
+  color: inherit;
+  text-decoration: none;
+}
+
+a.vc-card:hover {
+  border-color: var(--vc-primary);
+}

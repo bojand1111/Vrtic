@@ -1,0 +1,25 @@
+.vc-announcement-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vc-announcement-title--unread {
+  font-weight: 700;
+}
+
+.vc-announcement-targets {
+  border: 1px solid var(--vc-border);
+  border-radius: var(--vc-radius);
+  margin: 0 0 12px;
+  padding: 8px 12px;
+}

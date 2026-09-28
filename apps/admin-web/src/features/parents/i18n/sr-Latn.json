@@ -1,0 +1,21 @@
+{
+  "inviteHint": "Nove roditelje pozivate sa ekrana Zaposleni (Pozivnice). Ovde ih povezujete sa decom i potvrđujete veze.",
+  "empty": "Nema roditeljskih naloga.",
+  "parent": "Roditelj",
+  "email": "E-pošta",
+  "account": "Nalog",
+  "children": "Deca",
+  "membershipStatus": {
+    "INVITED": "Pozvan",
+    "ACTIVE": "Aktivan",
+    "SUSPENDED": "Suspendovan",
+    "REVOKED": "Opozvan"
+  },
+  "noLinks": "Nije povezan ni sa jednim detetom",
+  "linkChild": "Poveži sa detetom",
+  "byChild": "Roditelji po detetu",
+  "child": "Dete",
+  "others": "Ostali (staratelj, baka, deka...)",
+  "linkParent": "Poveži roditelja",
+  "accounts": "Roditeljski nalozi"
+}

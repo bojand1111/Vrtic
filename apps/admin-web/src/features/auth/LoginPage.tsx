@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { type SubmitEvent, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, useLocation } from 'react-router';
+import { Link, Navigate, useLocation } from 'react-router';
 
 import { login, type LoginRequest } from '../../api/auth';
 import { ApiProblem, NetworkError } from '../../api/problem';
@@ -155,6 +155,9 @@ export function LoginPage() {
             {mutation.isPending ? t('auth.submitting') : t('auth.submit')}
           </button>
         </form>
+        <p>
+          <Link to="/forgot-password">{t('auth.forgotLink')}</Link>
+        </p>
       </main>
 
       <footer className="vc-footer">

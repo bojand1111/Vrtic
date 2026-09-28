@@ -13,6 +13,7 @@
     "locations": "Objekti",
     "groups": "Grupe",
     "children": "Deca",
+    "absences": "Odsustva",
     "parents": "Roditelji",
     "employees": "Zaposleni",
     "attendance": "Prisustvo",
@@ -47,7 +48,48 @@
     "emailRequired": "Unesite e-poštu.",
     "emailInvalid": "Unesite ispravnu adresu e-pošte.",
     "passwordRequired": "Unesite lozinku.",
-    "formInvalid": "Obrazac sadrži greške. Proverite označena polja."
+    "formInvalid": "Obrazac sadrži greške. Proverite označena polja.",
+    "forgotLink": "Zaboravili ste lozinku?",
+    "backToLogin": "Nazad na prijavu",
+    "givenName": "Ime",
+    "familyName": "Prezime",
+    "newPassword": "Nova lozinka",
+    "confirmPassword": "Ponovite lozinku",
+    "passwordRules": "Najmanje 12 znakova; ne sme biti adresa e-pošte ni česta lozinka.",
+    "passwordTooShort": "Lozinka mora imati najmanje 12 znakova.",
+    "passwordMismatch": "Lozinke se ne poklapaju.",
+    "invite": {
+      "title": "Pozivnica",
+      "invalid": "Link pozivnice nije ispravan, istekao je ili je već iskorišćen.",
+      "intro": "Pozvani ste u „{{organization}}“ sa ulogom: {{role}}.",
+      "forEmail": "Pozivnica važi za adresu {{email}}.",
+      "registerIntro": "Napravite nalog da biste prihvatili pozivnicu.",
+      "namesRequired": "Unesite ime i prezime.",
+      "register": "Napravi nalog i prihvati",
+      "loginFirst": "Za ovu adresu već postoji nalog. Prijavite se, pa prihvatite pozivnicu.",
+      "signedInAs": "Prijavljeni ste kao {{email}}.",
+      "wrongAccount": "Pozivnica nije namenjena nalogu kojim ste prijavljeni. Odjavite se i prijavite sa pozvanom adresom.",
+      "accept": "Prihvati pozivnicu"
+    },
+    "verify": {
+      "title": "Potvrda e-pošte",
+      "invalid": "Link za potvrdu nije ispravan, istekao je ili je već iskorišćen.",
+      "done": "Adresa e-pošte je potvrđena. Sada se možete prijaviti.",
+      "intro": "Potvrdite adresu e-pošte za svoj nalog.",
+      "confirm": "Potvrdi e-poštu"
+    },
+    "forgot": {
+      "title": "Zaboravljena lozinka",
+      "intro": "Unesite e-poštu naloga. Ako nalog postoji, poslaćemo link za novu lozinku.",
+      "submit": "Pošalji link",
+      "sent": "Ako nalog sa tom adresom postoji, link za novu lozinku je poslat. Link važi 15 minuta."
+    },
+    "reset": {
+      "title": "Nova lozinka",
+      "invalid": "Link za promenu lozinke nije ispravan, istekao je ili je već iskorišćen.",
+      "done": "Lozinka je promenjena. Svi uređaji su odjavljeni; prijavite se novom lozinkom.",
+      "submit": "Sačuvaj lozinku"
+    }
   },
   "errors": {
     "network": "Nije moguće povezati se sa serverom. Proverite vezu i pokušajte ponovo.",
@@ -70,5 +112,47 @@
     "sr-Latn": "Srpski (latinica)",
     "sr-Cyrl": "Српски (ћирилица)",
     "en": "English"
+  },
+  "ui": {
+    "add": "Dodaj",
+    "edit": "Izmeni",
+    "save": "Sačuvaj",
+    "saving": "Čuvanje…",
+    "cancel": "Otkaži",
+    "close": "Zatvori",
+    "delete": "Obriši",
+    "remove": "Ukloni",
+    "confirm": "Potvrdi",
+    "confirmDelete": "Da li ste sigurni?",
+    "actions": "Akcije",
+    "search": "Pretraga",
+    "yes": "Da",
+    "no": "Ne",
+    "all": "Sve",
+    "none": "Nema",
+    "status": "Status",
+    "active": "Aktivno",
+    "inactive": "Neaktivno",
+    "saved": "Sačuvano.",
+    "back": "Nazad",
+    "details": "Detalji",
+    "from": "Od",
+    "to": "Do",
+    "date": "Datum",
+    "note": "Napomena",
+    "name": "Naziv",
+    "noAccess": "Nemate pristup ovom ekranu.",
+    "errors": {
+      "forbidden": "Nemate dozvolu za ovu radnju.",
+      "notFound": "Traženi podatak ne postoji ili vam nije dostupan.",
+      "conflict": "Podatak je u međuvremenu promenjen ili je u sukobu sa postojećim. Osvežite i pokušajte ponovo.",
+      "validation": "Proverite unete podatke."
+    }
+  },
+  "roles": {
+    "OWNER": "Vlasnik",
+    "ADMIN": "Administrator",
+    "TEACHER": "Vaspitač",
+    "PARENT": "Roditelj"
   }
 }

@@ -1,0 +1,49 @@
+{
+  "tabs": {
+    "staff": "Staff",
+    "members": "Members",
+    "invitations": "Invitations"
+  },
+  "status": {
+    "INVITED": "Invited",
+    "ACTIVE": "Active",
+    "SUSPENDED": "Suspended",
+    "REVOKED": "Revoked"
+  },
+  "invitationStatus": {
+    "PENDING": "Pending",
+    "ACCEPTED": "Accepted",
+    "EXPIRED": "Expired",
+    "REVOKED": "Revoked"
+  },
+  "email": "Email",
+  "role": "Role",
+  "jobTitle": "Job title",
+  "phone": "Phone",
+  "primaryLocation": "Primary location",
+  "groups": "Groups",
+  "startedAt": "Started",
+  "endedAt": "Ended",
+  "displayName": "Display name",
+  "editProfile": "Edit staff profile",
+  "staffEmpty": "No staff profiles.",
+  "membersEmpty": "No members match the filter.",
+  "children": "Children",
+  "createProfile": "Create staff profile",
+  "revoke": "Revoke",
+  "revokeTitle": "Revoke membership: {{name}}",
+  "revokeExplain": "The member loses access to the kindergarten immediately. Group assignments end and parent links to children are revoked.",
+  "revokeReason": "Reason (at least 3 characters)",
+  "yourPassword": "Your password",
+  "passwordHint": "For security, confirm this action with your password.",
+  "invite": "Invite",
+  "sendInvitation": "Send invitation",
+  "child": "Child",
+  "chooseChild": "Choose a child",
+  "sentAt": "Sent",
+  "expiresAt": "Expires",
+  "invitationsEmpty": "No invitations with this status.",
+  "confirmRevokeInvitation": "Revoke the invitation for {{email}}?",
+  "invitationSent": "The invitation was sent to {{email}}.",
+  "devMailInfo": "In the development environment no e-mail is sent: the invitation link is printed in the API window log (DEV MAIL)."
+}

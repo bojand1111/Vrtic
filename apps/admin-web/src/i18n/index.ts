@@ -1,6 +1,45 @@
 import i18next, { type i18n } from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
+import dashboardSrLatn from '../features/dashboard/i18n/sr-Latn.json';
+import dashboardSrCyrl from '../features/dashboard/i18n/sr-Cyrl.json';
+import dashboardEn from '../features/dashboard/i18n/en.json';
+import locationsSrLatn from '../features/locations/i18n/sr-Latn.json';
+import locationsSrCyrl from '../features/locations/i18n/sr-Cyrl.json';
+import locationsEn from '../features/locations/i18n/en.json';
+import groupsSrLatn from '../features/groups/i18n/sr-Latn.json';
+import groupsSrCyrl from '../features/groups/i18n/sr-Cyrl.json';
+import groupsEn from '../features/groups/i18n/en.json';
+import employeesSrLatn from '../features/employees/i18n/sr-Latn.json';
+import employeesSrCyrl from '../features/employees/i18n/sr-Cyrl.json';
+import employeesEn from '../features/employees/i18n/en.json';
+import childrenSrLatn from '../features/children/i18n/sr-Latn.json';
+import childrenSrCyrl from '../features/children/i18n/sr-Cyrl.json';
+import childrenEn from '../features/children/i18n/en.json';
+import parentsSrLatn from '../features/parents/i18n/sr-Latn.json';
+import parentsSrCyrl from '../features/parents/i18n/sr-Cyrl.json';
+import parentsEn from '../features/parents/i18n/en.json';
+import absencesSrLatn from '../features/absences/i18n/sr-Latn.json';
+import absencesSrCyrl from '../features/absences/i18n/sr-Cyrl.json';
+import absencesEn from '../features/absences/i18n/en.json';
+import schedulesSrLatn from '../features/schedules/i18n/sr-Latn.json';
+import schedulesSrCyrl from '../features/schedules/i18n/sr-Cyrl.json';
+import schedulesEn from '../features/schedules/i18n/en.json';
+import attendanceSrLatn from '../features/attendance/i18n/sr-Latn.json';
+import attendanceSrCyrl from '../features/attendance/i18n/sr-Cyrl.json';
+import attendanceEn from '../features/attendance/i18n/en.json';
+import announcementsSrLatn from '../features/announcements/i18n/sr-Latn.json';
+import announcementsSrCyrl from '../features/announcements/i18n/sr-Cyrl.json';
+import announcementsEn from '../features/announcements/i18n/en.json';
+import calendarSrLatn from '../features/calendar/i18n/sr-Latn.json';
+import calendarSrCyrl from '../features/calendar/i18n/sr-Cyrl.json';
+import calendarEn from '../features/calendar/i18n/en.json';
+import mealsSrLatn from '../features/meals/i18n/sr-Latn.json';
+import mealsSrCyrl from '../features/meals/i18n/sr-Cyrl.json';
+import mealsEn from '../features/meals/i18n/en.json';
+import settingsSrLatn from '../features/settings/i18n/sr-Latn.json';
+import settingsSrCyrl from '../features/settings/i18n/sr-Cyrl.json';
+import settingsEn from '../features/settings/i18n/en.json';
 import en from './locales/en.json';
 import srCyrl from './locales/sr-Cyrl.json';
 import srLatn from './locales/sr-Latn.json';
@@ -14,13 +53,18 @@ import {
   writeStoredLocale,
 } from './locale';
 
+// Each business feature owns its own namespace file (src/features/<feature>/i18n/<locale>.json).
+const srLatnAll = { ...srLatn, dashboard: dashboardSrLatn, locations: locationsSrLatn, groups: groupsSrLatn, employees: employeesSrLatn, children: childrenSrLatn, parents: parentsSrLatn, absences: absencesSrLatn, schedules: schedulesSrLatn, attendance: attendanceSrLatn, announcements: announcementsSrLatn, calendar: calendarSrLatn, meals: mealsSrLatn, settings: settingsSrLatn };
+const srCyrlAll = { ...srCyrl, dashboard: dashboardSrCyrl, locations: locationsSrCyrl, groups: groupsSrCyrl, employees: employeesSrCyrl, children: childrenSrCyrl, parents: parentsSrCyrl, absences: absencesSrCyrl, schedules: schedulesSrCyrl, attendance: attendanceSrCyrl, announcements: announcementsSrCyrl, calendar: calendarSrCyrl, meals: mealsSrCyrl, settings: settingsSrCyrl };
+const enAll = { ...en, dashboard: dashboardEn, locations: locationsEn, groups: groupsEn, employees: employeesEn, children: childrenEn, parents: parentsEn, absences: absencesEn, schedules: schedulesEn, attendance: attendanceEn, announcements: announcementsEn, calendar: calendarEn, meals: mealsEn, settings: settingsEn };
+
 export const resources = {
-  'sr-Latn': { translation: srLatn },
-  'sr-Cyrl': { translation: srCyrl },
-  en: { translation: en },
+  'sr-Latn': { translation: srLatnAll },
+  'sr-Cyrl': { translation: srCyrlAll },
+  en: { translation: enAll },
 } as const;
 
-export type TranslationSchema = typeof srLatn;
+export type TranslationSchema = typeof srLatnAll;
 
 function applyDocumentLocale(locale: Locale): void {
   setCurrentLocale(locale);

@@ -1,0 +1,50 @@
+/* Children / parents / absences / schedules screens (feature agent B). */
+.vc-row-clickable {
+  cursor: pointer;
+}
+
+.vc-row-clickable:hover td {
+  background: color-mix(in srgb, var(--vc-primary) 6%, transparent);
+}
+
+.vc-child-name {
+  margin: 1rem 0 0.5rem;
+}
+
+.vc-dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0 0 0.75rem;
+}
+
+.vc-dl dt {
+  color: var(--vc-muted);
+}
+
+.vc-dl dd {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.vc-fieldset {
+  border: 1px solid var(--vc-border);
+  border-radius: var(--vc-radius);
+  padding: 0.5rem 0.75rem;
+  margin: 0.5rem 0;
+}
+
+.vc-schedule-grid td input[type='time'] {
+  min-width: 7rem;
+}
+
+.vc-cell-error {
+  color: var(--vc-danger);
+  font-size: 0.85em;
+}
+
+@media (max-width: 640px) {
+  .vc-dl {
+    grid-template-columns: 1fr;
+  }
+}

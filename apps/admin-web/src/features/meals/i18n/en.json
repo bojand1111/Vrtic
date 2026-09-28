@@ -1,0 +1,23 @@
+{
+  "editDay": "Menu",
+  "slots": {
+    "BREAKFAST": "Breakfast",
+    "SNACK_AM": "Morning snack",
+    "LUNCH": "Lunch",
+    "SNACK_PM": "Afternoon snack"
+  },
+  "allergens": "Allergens",
+  "allergensPlaceholder": "e.g. GLUTEN, MILK",
+  "allergensHint": "Separate allergens with commas; they are stored as upper-case tags without diacritics (GLUTEN, MILK, EGGS).",
+  "previousWeek": "Previous week",
+  "nextWeek": "Next week",
+  "thisWeek": "This week",
+  "noMenu": "No menu entered.",
+  "published": "Published",
+  "draft": "Not published",
+  "locationMenu": "Location menu",
+  "empty": "None",
+  "add": "Enter menu",
+  "publish": "Publish",
+  "disclaimer": "Allergen tags are informational and not medical advice."
+}

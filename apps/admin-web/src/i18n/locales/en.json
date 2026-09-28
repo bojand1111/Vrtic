@@ -13,6 +13,7 @@
     "locations": "Locations",
     "groups": "Groups",
     "children": "Children",
+    "absences": "Absences",
     "parents": "Parents",
     "employees": "Employees",
     "attendance": "Attendance",
@@ -47,7 +48,48 @@
     "emailRequired": "Enter your email.",
     "emailInvalid": "Enter a valid email address.",
     "passwordRequired": "Enter your password.",
-    "formInvalid": "The form has errors. Check the highlighted fields."
+    "formInvalid": "The form has errors. Check the highlighted fields.",
+    "forgotLink": "Forgot your password?",
+    "backToLogin": "Back to sign in",
+    "givenName": "Given name",
+    "familyName": "Family name",
+    "newPassword": "New password",
+    "confirmPassword": "Repeat the password",
+    "passwordRules": "At least 12 characters; not your e-mail address and not a common password.",
+    "passwordTooShort": "The password must have at least 12 characters.",
+    "passwordMismatch": "The passwords do not match.",
+    "invite": {
+      "title": "Invitation",
+      "invalid": "The invitation link is invalid, expired or already used.",
+      "intro": "You are invited to \"{{organization}}\" with the role: {{role}}.",
+      "forEmail": "The invitation is for {{email}}.",
+      "registerIntro": "Create an account to accept the invitation.",
+      "namesRequired": "Enter your given and family name.",
+      "register": "Create account and accept",
+      "loginFirst": "An account already exists for this address. Sign in, then accept the invitation.",
+      "signedInAs": "You are signed in as {{email}}.",
+      "wrongAccount": "This invitation is not for the account you are signed in with. Sign out and sign in with the invited address.",
+      "accept": "Accept invitation"
+    },
+    "verify": {
+      "title": "E-mail confirmation",
+      "invalid": "The confirmation link is invalid, expired or already used.",
+      "done": "Your e-mail address is confirmed. You can sign in now.",
+      "intro": "Confirm the e-mail address of your account.",
+      "confirm": "Confirm e-mail"
+    },
+    "forgot": {
+      "title": "Forgotten password",
+      "intro": "Enter the e-mail of your account. If the account exists, we will send a link to set a new password.",
+      "submit": "Send link",
+      "sent": "If an account with this address exists, a link to set a new password has been sent. The link is valid for 15 minutes."
+    },
+    "reset": {
+      "title": "New password",
+      "invalid": "The password reset link is invalid, expired or already used.",
+      "done": "Your password was changed. All devices were signed out; sign in with the new password.",
+      "submit": "Save password"
+    }
   },
   "errors": {
     "network": "Could not reach the server. Check your connection and try again.",
@@ -70,5 +112,47 @@
     "sr-Latn": "Srpski (latinica)",
     "sr-Cyrl": "Српски (ћирилица)",
     "en": "English"
+  },
+  "ui": {
+    "add": "Add",
+    "edit": "Edit",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "close": "Close",
+    "delete": "Delete",
+    "remove": "Remove",
+    "confirm": "Confirm",
+    "confirmDelete": "Are you sure?",
+    "actions": "Actions",
+    "search": "Search",
+    "yes": "Yes",
+    "no": "No",
+    "all": "All",
+    "none": "None",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "saved": "Saved.",
+    "back": "Back",
+    "details": "Details",
+    "from": "From",
+    "to": "To",
+    "date": "Date",
+    "note": "Note",
+    "name": "Name",
+    "noAccess": "You do not have access to this screen.",
+    "errors": {
+      "forbidden": "You are not allowed to do this.",
+      "notFound": "The item does not exist or is not available to you.",
+      "conflict": "The item was changed meanwhile or conflicts with an existing one. Refresh and try again.",
+      "validation": "Please check the entered data."
+    }
+  },
+  "roles": {
+    "OWNER": "Owner",
+    "ADMIN": "Administrator",
+    "TEACHER": "Teacher",
+    "PARENT": "Parent"
   }
 }

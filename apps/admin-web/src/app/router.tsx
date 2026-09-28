@@ -1,8 +1,13 @@
 import type { RouteObject } from 'react-router';
 
+import { AbsencesPage } from '../features/absences/AbsencesPage';
 import { AnnouncementsPage } from '../features/announcements/AnnouncementsPage';
 import { AttendancePage } from '../features/attendance/AttendancePage';
+import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage';
+import { InvitePage } from '../features/auth/InvitePage';
 import { LoginPage } from '../features/auth/LoginPage';
+import { ResetPasswordPage } from '../features/auth/ResetPasswordPage';
+import { VerifyEmailPage } from '../features/auth/VerifyEmailPage';
 import { BillingPage } from '../features/billing/BillingPage';
 import { CalendarPage } from '../features/calendar/CalendarPage';
 import { ChildrenPage } from '../features/children/ChildrenPage';
@@ -28,6 +33,11 @@ export const routes: RouteObject[] = [
     Component: LoginPage,
     ErrorBoundary: RootErrorBoundary,
   },
+  // Public account pages reached from e-mail links (no session required).
+  { path: '/invite', Component: InvitePage, ErrorBoundary: RootErrorBoundary },
+  { path: '/verify-email', Component: VerifyEmailPage, ErrorBoundary: RootErrorBoundary },
+  { path: '/forgot-password', Component: ForgotPasswordPage, ErrorBoundary: RootErrorBoundary },
+  { path: '/reset-password', Component: ResetPasswordPage, ErrorBoundary: RootErrorBoundary },
   {
     path: '/',
     Component: ProtectedShell,
@@ -38,6 +48,7 @@ export const routes: RouteObject[] = [
       { path: 'locations', Component: LocationsPage },
       { path: 'groups', Component: GroupsPage },
       { path: 'children', Component: ChildrenPage },
+      { path: 'absences', Component: AbsencesPage },
       { path: 'parents', Component: ParentsPage },
       { path: 'employees', Component: EmployeesPage },
       { path: 'attendance', Component: AttendancePage },

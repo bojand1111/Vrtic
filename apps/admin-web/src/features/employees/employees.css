@@ -1,0 +1,27 @@
+/* Tabs of the Employees screen (staff / members / invitations). */
+.vc-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--vc-border);
+}
+
+.vc-tab {
+  font: inherit;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: var(--vc-radius) var(--vc-radius) 0 0;
+  background: transparent;
+  color: var(--vc-muted);
+  cursor: pointer;
+}
+
+.vc-tab--active {
+  background: var(--vc-surface);
+  border-color: var(--vc-border);
+  color: var(--vc-text);
+  font-weight: 600;
+  margin-bottom: -1px;
+}

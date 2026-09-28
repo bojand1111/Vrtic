@@ -1,5 +1,5 @@
 /** Mirrors app.organization_memberships.role in docs/database/schema.sql. */
-export type OrganizationRole = 'KINDERGARTEN_OWNER' | 'ADMIN' | 'TEACHER' | 'PARENT';
+export type OrganizationRole = 'OWNER' | 'ADMIN' | 'TEACHER' | 'PARENT';
 
 export interface OrganizationMembership {
   readonly organizationId: string;

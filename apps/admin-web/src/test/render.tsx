@@ -22,7 +22,7 @@ export const TEST_USER: SessionUser = {
   displayName: 'Vlasnik Vrtića',
   isPlatformAdmin: false,
   memberships: [
-    { organizationId: 'org-a', organizationName: 'Vrtić Sunce', role: 'KINDERGARTEN_OWNER' },
+    { organizationId: 'org-a', organizationName: 'Vrtić Sunce', role: 'OWNER' },
     { organizationId: 'org-b', organizationName: 'Vrtić Zvezdica', role: 'ADMIN' },
   ],
 };

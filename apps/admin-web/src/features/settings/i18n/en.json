@@ -1,0 +1,21 @@
+{
+  "readOnly": "Only the organization owner can change the settings.",
+  "dayOpensAt": "Opens at",
+  "dayClosesAt": "Closes at",
+  "workingWeekdays": "Working days",
+  "weekdays": {
+    "1": "Monday",
+    "2": "Tuesday",
+    "3": "Wednesday",
+    "4": "Thursday",
+    "5": "Friday",
+    "6": "Saturday",
+    "7": "Sunday"
+  },
+  "scheduleChangeDeadlineHours": "Schedule change deadline (hours)",
+  "scheduleChangeDeadlineHint": "How many hours in advance a parent may change arrival or departure (0 to 168).",
+  "lateArrivalGraceMinutes": "Late arrival grace (minutes)",
+  "lateArrivalGraceHint": "Minutes after which an arrival counts as late (0 to 180).",
+  "offlineCacheTtlHours": "Offline cache lifetime (hours)",
+  "offlineCacheTtlHint": "How long the mobile app keeps data without a connection (1 to 48)."
+}

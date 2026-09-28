@@ -1,0 +1,34 @@
+{
+  "new": "New event",
+  "edit": "Edit event",
+  "fields": {
+    "kind": "Type",
+    "title": "Title",
+    "description": "Description",
+    "allDay": "All day",
+    "startTime": "Start",
+    "endTime": "End",
+    "location": "Location",
+    "group": "Group"
+  },
+  "kinds": {
+    "TRIP": "Trip",
+    "PHOTO_DAY": "Photo day",
+    "PERFORMANCE": "Performance",
+    "HOLIDAY": "Holiday",
+    "PARENT_MEETING": "Parent meeting",
+    "CLOSURE": "Closed",
+    "OTHER": "Other"
+  },
+  "wholeOrganization": "Whole kindergarten",
+  "noGroup": "No group",
+  "scope": {
+    "group": "Group",
+    "location": "Location"
+  },
+  "allDay": "All day",
+  "previousMonth": "Previous month",
+  "nextMonth": "Next month",
+  "today": "Today",
+  "empty": "No events this month."
+}

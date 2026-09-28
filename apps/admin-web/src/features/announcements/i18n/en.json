@@ -1,0 +1,45 @@
+{
+  "new": "New announcement",
+  "edit": "Edit announcement",
+  "fields": {
+    "title": "Title",
+    "body": "Text",
+    "audience": "Recipients",
+    "groups": "Groups",
+    "locations": "Locations"
+  },
+  "audience": {
+    "ORGANIZATION": "Whole kindergarten",
+    "LOCATION": "Location",
+    "GROUP": "Group",
+    "GUARDIAN": "Parent"
+  },
+  "noTargets": "Nothing available to choose.",
+  "status": {
+    "DRAFT": "Draft",
+    "PUBLISHED": "Published",
+    "ARCHIVED": "Archived"
+  },
+  "columns": {
+    "publishedAt": "Published",
+    "reads": "Read"
+  },
+  "actions": {
+    "publish": "Publish",
+    "archive": "Archive",
+    "recipients": "Recipients"
+  },
+  "confirmPublish": "Publish the announcement? Recipients are determined at the moment of publishing.",
+  "confirmArchive": "Archive the announcement? Recipients will no longer see it.",
+  "recipients": {
+    "title": "Recipients",
+    "role": "Role",
+    "readAt": "Read",
+    "unread": "Unread",
+    "summary": "Read by {{read}} of {{total}} recipients."
+  },
+  "inbox": {
+    "empty": "No announcements for you.",
+    "new": "New"
+  }
+}

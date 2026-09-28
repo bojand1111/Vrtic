@@ -1,0 +1,45 @@
+{
+  "new": "Novo obaveštenje",
+  "edit": "Izmena obaveštenja",
+  "fields": {
+    "title": "Naslov",
+    "body": "Tekst",
+    "audience": "Primaoci",
+    "groups": "Grupe",
+    "locations": "Objekti"
+  },
+  "audience": {
+    "ORGANIZATION": "Ceo vrtić",
+    "LOCATION": "Objekat",
+    "GROUP": "Grupa",
+    "GUARDIAN": "Roditelj"
+  },
+  "noTargets": "Nema dostupnih stavki za izbor.",
+  "status": {
+    "DRAFT": "Nacrt",
+    "PUBLISHED": "Objavljeno",
+    "ARCHIVED": "Arhivirano"
+  },
+  "columns": {
+    "publishedAt": "Objavljeno",
+    "reads": "Pročitano"
+  },
+  "actions": {
+    "publish": "Objavi",
+    "archive": "Arhiviraj",
+    "recipients": "Primaoci"
+  },
+  "confirmPublish": "Objaviti obaveštenje? Primaoci se određuju u trenutku objave.",
+  "confirmArchive": "Arhivirati obaveštenje? Primaoci ga više neće videti.",
+  "recipients": {
+    "title": "Primaoci",
+    "role": "Uloga",
+    "readAt": "Pročitano",
+    "unread": "Nepročitano",
+    "summary": "Pročitalo {{read}} od {{total}} primalaca."
+  },
+  "inbox": {
+    "empty": "Nema obaveštenja za vas.",
+    "new": "Novo"
+  }
+}
