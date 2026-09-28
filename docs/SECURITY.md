@@ -31,7 +31,7 @@
 - **Refresh rotation**: `POST /auth/refresh` u jednoj transakciji radi `UPDATE refresh_tokens SET consumed_at = now(), replaced_by_id = <novi> WHERE token_hash = ? AND consumed_at IS NULL` (atomic consume) i izdaje novi par. Ako `UPDATE` pogodi 0 redova, a token postoji sa `consumed_at IS NOT NULL` → **ponovna upotreba**: upisuje se `reuse_detected_at`, cela sesija se opoziva (`sessions.revoked_at`, razlog `REUSE_DETECTED`), svi access tokeni sesije se opozivaju, korisnik dobija bezbednosnu notifikaciju.
 - **Online provera opoziva**: svaki zahtev traži access token po hash-u i proverava `expires_at`, `revoked_at`, `sessions.revoked_at`, `sessions.absolute_expires_at`, `users.status`. Nema lokalnog keša tokena u P0.
 - Sesije: lista uređaja (`GET /auth/sessions`), opoziv jedne (`DELETE /auth/sessions/{id}`), odjava svih (`POST /auth/logout-all`), promena lozinke opoziva sve ostale sesije.
-- **Reauthentication** (`POST /auth/reauthenticate`) osvežava `sessions.reauthenticated_at`; osetljive akcije (promena e-maila/lozinke, opoziv staratelja, čitanje zdravstvenih podataka od strane osoblja, billing) zahtevaju reauth u poslednjih 10 minuta.
+- **Reauthentication** (`POST /auth/reauthenticate`) osvežava `sessions.reauthenticated_at`; osetljive akcije (promena e-maila/lozinke, opoziv staratelja, čitanje zdravstvenih podataka od strane osoblja, billing) zahtevaju reauth u poslednjih 5 minuta (sveža prijava se računa); implementirano u E02-B10 kao `RecentAuthentication.require` unutar auth transakcije, pogrešna lozinka pri reautentifikaciji je ograničena na 5 pokušaja u 15 minuta.
 - **MFA (TOTP)**: obavezna za platform admine, vlasnike i support pristup; sesija bez `mfa_verified_at` može samo da završi MFA. Tajna je envelope-šifrovana (`user_mfa_methods.secret_enc`, `key_id`); recovery kodovi su hash-ovani, jednokratni.
 
 ### 2.2 Web (cookie režim)
@@ -53,7 +53,7 @@
 - Parametri iz konfiguracije; početno `m=64 MiB, t=3, p=1`; produkcione vrednosti se podešavaju komandom `benchmark-argon2` na ciljnom serveru (cilj 250–500 ms po hešu). `needsRehash` omogućava tihi upgrade pri sledećoj prijavi.
 - Politika: minimum 10 znakova, provera protiv liste najčešćih lozinki (planirano), bez obaveznih „specijalnih znakova”.
 - **Generičke poruke**: prijava, zaboravljena lozinka i registracija preko pozivnice vraćaju isti odgovor bez obzira na to da li e-mail postoji. Vreme odgovora se izjednačava (hash se računa i za nepostojeći nalog).
-- **Brute force**: `login_attempts` (hash e-maila + IP) + Ktor RateLimit: 5 neuspeha po nalogu u 15 min → privremeno zaključavanje (`users.locked_until`, eksponencijalno); 20 zahteva po IP-ju u minuti na auth rutama → `429` sa `Retry-After`.
+- **Brute force** (implementirano u E02-B13): svaki pokušaj prijave se upisuje u `login_attempts` (sha256 e-maila + IP), trajno i nezavisno od instance. 10 neuspeha za isti e-mail u 15 min → `users.locked_until` (15 min, udvostručava se za svaki sledeći blok neuspeha, najviše 24 h) i `429` sa `Retry-After`; isti odgovor važi i za nepostojeći nalog (brojanje po hash-u e-maila), pa odgovor ne otkriva postojanje naloga. Uspešna prijava resetuje brojač. In-memory limiter po procesu: 20 zahteva po IP-ju u minuti na svim auth rutama; `forgot-password` i `resend-verification` dodatno 3 po e-mailu na sat. Klijentski IP iz `X-Forwarded-For` samo uz `APP_TRUST_PROXY=true` (iza sopstvenog nginx-a). Ograničenje: IP/e-mail limiter je po instanci; brojač po nalogu je u bazi.
 
 ## 3. Autorizacija
 

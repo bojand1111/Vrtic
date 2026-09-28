@@ -21,20 +21,18 @@ object Tokens {
         return kind.prefix + encoder.encodeToString(bytes)
     }
 
-    fun isAccessToken(token: String): Boolean =
-        token.length == Kind.ACCESS.prefix.length + 43 &&
-            token.startsWith(Kind.ACCESS.prefix) &&
-            token.drop(Kind.ACCESS.prefix.length).all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '-' || it == '_' }
+    /** Shape check before any hashing/DB lookup: prefix + 43 base64url characters. */
+    fun isKind(token: String, kind: Kind): Boolean =
+        token.length == kind.prefix.length + 43 &&
+            token.startsWith(kind.prefix) &&
+            token.drop(kind.prefix.length).all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '-' || it == '_' }
 
-    fun isRefreshToken(token: String): Boolean =
-        token.length == Kind.REFRESH.prefix.length + 43 &&
-            token.startsWith(Kind.REFRESH.prefix) &&
-            token.drop(Kind.REFRESH.prefix.length).all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '-' || it == '_' }
-
-    fun isCsrfToken(token: String): Boolean =
-        token.length == Kind.CSRF.prefix.length + 43 &&
-            token.startsWith(Kind.CSRF.prefix) &&
-            token.drop(Kind.CSRF.prefix.length).all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '-' || it == '_' }
+    fun isAccessToken(token: String): Boolean = isKind(token, Kind.ACCESS)
+    fun isRefreshToken(token: String): Boolean = isKind(token, Kind.REFRESH)
+    fun isCsrfToken(token: String): Boolean = isKind(token, Kind.CSRF)
+    fun isResetToken(token: String): Boolean = isKind(token, Kind.RESET)
+    fun isVerifyToken(token: String): Boolean = isKind(token, Kind.VERIFY)
+    fun isInviteToken(token: String): Boolean = isKind(token, Kind.INVITE)
 
     fun sha256(token: String): ByteArray =
         MessageDigest.getInstance("SHA-256").digest(token.toByteArray(Charsets.US_ASCII))

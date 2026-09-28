@@ -35,6 +35,8 @@ docker-compose.yml  lokalni PostgreSQL 17 (+ profil `app` za migrate/api u konte
 
 ## Lokalno pokretanje
 
+Dvoklik za razvoj na Windows-u: `scripts\start-vrtic.ps1` (baza, migracije, API, web, browser) i `scripts\stop-vrtic.ps1`, uz prenosive alate u `C:\Posao\Vrtic-tools` (JDK 21, PostgreSQL 17 na portu 5433); prvo podešavanje radi `scripts\dev-up.ps1 -DbPort 5433`. Najkraći put bez toga (PostgreSQL 17 radi, JDK 21 i `psql` na PATH-u): `.\scripts\dev-up.ps1 -Serve` odradi role, build, migracije, seed, RLS testove, dev lozinke i pokrene API. Ručni koraci su ispod, a tokovi za testiranje u [docs/MANUAL_TEST_EPIC02.md](docs/MANUAL_TEST_EPIC02.md).
+
 Preduslovi: JDK 21, Docker (ili lokalni PostgreSQL 17), Node 22. Za Android build i Android SDK; za iOS macOS + Xcode + XcodeGen.
 
 ```bash
@@ -54,12 +56,13 @@ java -jar build/libs/vrtic-backend-all.jar serve      # http://localhost:8080
 
 Provera: `GET /health/live`, `GET /health/ready` (proverava bazu i migracije), DB-backed `POST /api/v1/auth/login` → Bearer tokene za mobilne klijente ili HttpOnly kolačiće + `vc_csrf` za web, `POST /api/v1/auth/refresh` → rotiran par tokena uz CSRF za cookie režim, `GET /api/v1/auth/session` → trenutni korisnik i članstva, `POST /api/v1/auth/logout` → opoziv tekuće sesije, `GET /api/v1/organizations/{id}/ping` → `401` bez sesije.
 
-Seed (sintetički podaci; odbija bazu koja nije označena kao `dev`):
+Seed (sintetički podaci; odbija bazu koja nije označena kao `dev`). Lozinke nisu u SQL-u: posle seed-a se postavljaju DEV komandom koja čita `SEED_DEV_PASSWORD` iz okruženja (odbija van `APP_ENV=dev`):
 
 ```bash
 psql -h localhost -U postgres -d postgres -c "ALTER DATABASE vrtic SET app.environment = 'dev';"
 psql -h localhost -U app_owner -d vrtic -f docs/database/seed/dev_seed.sql
 psql -h localhost -U app_runtime -d vrtic -f docs/database/tests/rls_negative_tests.sql
+SEED_DEV_PASSWORD='<dev lozinka, 12+ znakova>' java -jar backend/build/libs/vrtic-backend-all.jar dev-set-password vlasnik@happykids.example.test
 ```
 
 Backend testovi (integracioni RLS testovi se uključuju promenljivom):

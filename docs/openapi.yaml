@@ -224,7 +224,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles: []
   /auth/register:
     post:
@@ -234,7 +234,7 @@ paths:
       summary: Register via invitation
       description: >-
         Creates the user account for the e-mail bound to the invitation, accepts the invitation (creating the membership / PENDING guardian
-        link), sends the e-mail verification link and starts a session. Self-registration without an invitation does not exist. Password
+        link), marks the e-mail as verified (the invitation token was delivered to that mailbox) and starts a session. Self-registration without an invitation does not exist. Password
         policy violations → `422`; an already registered e-mail → `409 EMAIL_ALREADY_REGISTERED` (the client should log in and call `POST
         /me/invitations/accept`).
       security: []
@@ -262,7 +262,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles: []
   /auth/login:
     post:
@@ -275,7 +275,9 @@ paths:
         readable session-bound `vc_csrf` cookie; mobile clients receive `tokens`. Accounts with MFA get `status: MFA_REQUIRED` and a
         `mfaChallengeToken`. Failed attempts are counted per e-mail hash and IP; generic `401 INVALID_CREDENTIALS` is returned whether the
         account exists or not. The current implementation covers verified-user Argon2id login, opaque token issuance and cookie delivery;
-        MFA and rate limiting are subsequent tasks.
+        MFA is a subsequent task. Brute force: every attempt is recorded in `login_attempts`; after 10 failures for the same
+        e-mail hash within 15 minutes (or while `locked_until` is in the future) the answer is `429` with `Retry-After`,
+        identical for unknown accounts; 20 requests per client IP per minute across `/auth/*`.
       security: []
       requestBody:
         required: true
@@ -298,12 +300,6 @@ paths:
           $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/ValidationError"
-        "423":
-          description: Account temporarily locked after repeated failures (`ACCOUNT_LOCKED`).
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
         "429":
           $ref: "#/components/responses/TooManyRequests"
         "501":
@@ -476,7 +472,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -520,7 +516,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -559,7 +555,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -595,7 +591,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles: []
   /auth/resend-verification:
     post:
@@ -603,12 +599,16 @@ paths:
       tags:
         - Auth
       summary: Resend verification e-mail
-      description: Sends a new verification link to the caller's unverified e-mail. Rate-limited (max 3 per hour). Always `202`.
-      security:
-        - cookieAuth: []
-        - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/CsrfToken"
+      description: >-
+        Sends a new verification link when an account with this e-mail exists and is still unverified. Unauthenticated (an
+        unverified account cannot hold a session). Rate-limited (max 3 per hour, E02-B13). Always `202`, identical regardless of account existence.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailRequest"
       responses:
         "202":
           description: Accepted (e-mail queued).
@@ -627,7 +627,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -665,7 +665,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles: []
   /auth/reset-password:
     post:
@@ -697,7 +697,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles: []
   /auth/reauthenticate:
     post:
@@ -707,7 +707,8 @@ paths:
       summary: Re-authenticate for sensitive actions
       description: >-
         Re-enters password (+ TOTP when enrolled) and stamps `Session.reauthenticatedAt`. Operations marked `x-requires-reauthentication`
-        need this within the last 10 minutes, otherwise they answer `403 REAUTHENTICATION_REQUIRED`.
+        need this within the last 5 minutes (a fresh login counts too), otherwise they answer `403 REAUTHENTICATION_REQUIRED`.
+        Wrong password → `403 INVALID_CREDENTIALS` (5 attempts per 15 minutes per user); TOTP verification arrives with MFA (E02-B11).
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -741,7 +742,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -1044,7 +1045,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -1092,7 +1093,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -1100,6 +1101,50 @@ paths:
         - PARENT
         - SUPER_ADMIN
         - SUPPORT
+  /me/password:
+    post:
+      operationId: changeMyPassword
+      tags:
+        - Me
+      summary: Change own password
+      description: >-
+        Replaces the password after verifying the current one (that verification is the re-authentication for this action).
+        Policy violations → `422`; wrong current password → `403 CURRENT_PASSWORD_INVALID` (rate-limited per user). On success every
+        OTHER session of the user is revoked (`PASSWORD_CHANGED`); the current session stays valid and gets a fresh `reauthenticatedAt`.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "204":
+          description: No content.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+      x-priority: P0
+      x-status: implemented
+      x-roles:
+        - OWNER
+        - ADMIN
+        - TEACHER
+        - PARENT
+        - SUPER_ADMIN
+        - SUPPORT
+      x-requires-reauthentication: true
   /me/memberships:
     get:
       operationId: listMyMemberships
@@ -1154,7 +1199,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -1205,7 +1250,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -1412,7 +1457,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - SUPER_ADMIN
         - SUPPORT
@@ -2592,7 +2637,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -2639,10 +2684,11 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
-        - ADMIN
+      x-permissions:
+        - ORG_SETTINGS_MANAGE
   /organizations/{organizationId}/dashboard:
     get:
       operationId: getDashboardSummary
@@ -9697,7 +9743,7 @@ components:
       additionalProperties: false
     ReauthenticateRequest:
       type: object
-      description: Re-enters credentials for a sensitive action; refreshes `Session.reauthenticatedAt` (valid 10 min).
+      description: Re-enters credentials for a sensitive action; refreshes `Session.reauthenticatedAt` (valid 5 min).
       properties:
         password:
           type: string
@@ -9911,6 +9957,23 @@ components:
           $ref: "#/components/schemas/Locale"
       required:
         - preferredLocale
+      additionalProperties: false
+    ChangePasswordRequest:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 256
+        newPassword:
+          type: string
+          format: password
+          minLength: 12
+          maxLength: 256
+      required:
+        - currentPassword
+        - newPassword
       additionalProperties: false
     OrganizationRef:
       type: object

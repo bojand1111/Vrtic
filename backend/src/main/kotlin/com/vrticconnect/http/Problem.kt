@@ -77,6 +77,14 @@ class ProblemException(
             headers = mapOf("WWW-Authenticate" to "Bearer realm=\"vrtic\""),
         )
 
+        /** Sensitive action without a recent login/re-authentication (docs/SECURITY.md 2.1). */
+        fun reauthenticationRequired() = ProblemException(
+            status = HttpStatusCode.Forbidden,
+            type = ProblemTypes.FORBIDDEN,
+            title = "Recent authentication required",
+            detail = "REAUTHENTICATION_REQUIRED",
+        )
+
         fun csrfInvalid() = ProblemException(
             status = HttpStatusCode.Forbidden,
             type = ProblemTypes.FORBIDDEN,

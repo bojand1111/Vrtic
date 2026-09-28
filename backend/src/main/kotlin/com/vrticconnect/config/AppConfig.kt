@@ -39,6 +39,8 @@ data class AppConfig(
     val dbRuntimePassword: String?,
     val webOrigin: String,
     val argon2: Argon2Config,
+    /** Only behind the project's own reverse proxy: use the first X-Forwarded-For entry as client IP. */
+    val trustProxyHeaders: Boolean = false,
 ) {
     val jdbcUrl: String get() = "jdbc:postgresql://$dbHost:$dbPort/$dbName"
     val isDev: Boolean get() = env == AppEnv.DEV
@@ -61,6 +63,7 @@ data class AppConfig(
                 dbRuntimeUser = env["APP_DB_RUNTIME_USER"] ?: "app_runtime",
                 dbRuntimePassword = secret("APP_DB_RUNTIME_PASSWORD", "change-me-runtime"),
                 webOrigin = env["APP_WEB_ORIGIN"] ?: "http://localhost:5173",
+                trustProxyHeaders = env["APP_TRUST_PROXY"]?.equals("true", ignoreCase = true) ?: false,
                 argon2 = Argon2Config(
                     memoryKib = env["ARGON2_MEMORY_KIB"]?.toInt() ?: 65_536,
                     iterations = env["ARGON2_ITERATIONS"]?.toInt() ?: 3,

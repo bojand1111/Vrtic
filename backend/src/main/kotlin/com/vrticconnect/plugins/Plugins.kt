@@ -7,10 +7,12 @@ import com.vrticconnect.http.respondProblem
 import com.vrticconnect.http.toProblem
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.URLDecodeException
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.plugins.calllogging.CallLogging
+import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.plugins.callid.CallId
 import io.ktor.server.plugins.callid.callId
 import io.ktor.server.plugins.callid.callIdMdc
@@ -69,6 +71,20 @@ fun Application.configureStatusPages() {
     install(StatusPages) {
         exception<ProblemException> { call, cause ->
             call.respondProblem(call.toProblem(cause), cause.status, cause.headers)
+        }
+        // Malformed percent-encoding or unparsable path/query is a client error, never a 500.
+        // Ktor's routing wraps path decode failures in BadRequestException; query decoding throws URLDecodeException.
+        exception<BadRequestException> { call, _ ->
+            call.respondProblem(
+                Problem(type = ProblemTypes.VALIDATION, title = "Malformed request", status = 400, instance = call.request.path(), requestId = call.callId),
+                HttpStatusCode.BadRequest,
+            )
+        }
+        exception<URLDecodeException> { call, _ ->
+            call.respondProblem(
+                Problem(type = ProblemTypes.VALIDATION, title = "Malformed URL encoding", status = 400, instance = call.request.path(), requestId = call.callId),
+                HttpStatusCode.BadRequest,
+            )
         }
         exception<SerializationException> { call, cause ->
             call.respondProblem(

@@ -1447,19 +1447,32 @@ BEGIN
   END LOOP;
 END $$;
 
+-- Invitation acceptance (auth module, keyed by token hash) happens before any tenant context exists (V4).
+CREATE POLICY invitations_auth ON app.invitations FOR SELECT TO app_runtime USING (app.auth_mode());
+CREATE POLICY invitations_auth_accept ON app.invitations FOR UPDATE TO app_runtime USING (app.auth_mode()) WITH CHECK (app.auth_mode());
+CREATE POLICY memberships_auth_accept ON app.organization_memberships FOR ALL TO app_runtime USING (app.auth_mode()) WITH CHECK (app.auth_mode());
+
 -- organization_memberships: a user may additionally read their OWN memberships across tenants (tenant switcher).
 CREATE POLICY self_memberships ON app.organization_memberships FOR SELECT TO app_runtime
   USING (user_id = app.current_user_id());
+-- ... and the rows describing those memberships: own extra permissions and own employee profile (V3).
+CREATE POLICY self_membership_permissions ON app.membership_permissions FOR SELECT TO app_runtime
+  USING (EXISTS (SELECT 1 FROM app.organization_memberships m
+                 WHERE m.id = membership_permissions.membership_id AND m.user_id = app.current_user_id()));
+CREATE POLICY self_employee ON app.employees FOR SELECT TO app_runtime
+  USING (EXISTS (SELECT 1 FROM app.organization_memberships m
+                 WHERE m.id = employees.membership_id AND m.user_id = app.current_user_id()));
 
--- organizations: current tenant, or any org the current user is an active member of (switcher), or platform mode.
+-- organizations: current tenant, or any org the current user is a non-revoked member of (switcher), or platform mode.
 ALTER TABLE app.organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app.organizations FORCE ROW LEVEL SECURITY;
 CREATE POLICY organizations_access ON app.organizations FOR SELECT TO app_runtime
   USING (
     id = app.current_organization_id()
     OR app.platform_mode()
+    OR app.auth_mode()
     OR EXISTS (SELECT 1 FROM app.organization_memberships m
-               WHERE m.organization_id = organizations.id AND m.user_id = app.current_user_id() AND m.status = 'ACTIVE')
+               WHERE m.organization_id = organizations.id AND m.user_id = app.current_user_id() AND m.status <> 'REVOKED')
   );
 CREATE POLICY organizations_write_tenant ON app.organizations FOR UPDATE TO app_runtime
   USING (id = app.current_organization_id() OR app.platform_mode())

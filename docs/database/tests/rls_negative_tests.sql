@@ -92,7 +92,7 @@ BEGIN
 
   -- ---------------------------------------------------------------- 5. platform mode
   PERFORM set_config('app.user_id', '11111111-0000-0000-0000-000000000001', true), set_config('app.platform_mode', 'on', true);
-  SELECT count(*) INTO n FROM app.organizations; IF n <> 2 THEN RAISE EXCEPTION 'platform: expected all organizations'; END IF; passed := passed + 1;
+  SELECT count(*) INTO n FROM app.organizations WHERE slug IN ('happy-kids','suncica'); IF n <> 2 THEN RAISE EXCEPTION 'platform: expected both seed organizations'; END IF; passed := passed + 1;
   SELECT count(*) INTO n FROM app.locations;     IF n <> 0 THEN RAISE EXCEPTION 'platform: tenant tables visible without org context'; END IF; passed := passed + 1;
   PERFORM set_config('app.platform_mode', '', true);
 

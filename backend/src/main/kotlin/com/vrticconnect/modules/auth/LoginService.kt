@@ -2,9 +2,14 @@ package com.vrticconnect.modules.auth
 
 import com.vrticconnect.db.Database
 import com.vrticconnect.db.DbContext
+import com.vrticconnect.http.AuthRateLimits
 import com.vrticconnect.http.ProblemException
-import io.ktor.http.HttpHeaders
+import com.vrticconnect.http.RateLimiter
+import com.vrticconnect.http.clientIp
+import com.vrticconnect.http.rateLimited
+import com.vrticconnect.modules.audit.Audit
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.plugins.callid.callId
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import kotlinx.serialization.Serializable
@@ -56,7 +61,16 @@ class LoginService(
     private val passwordHasher: PasswordHasher,
     private val devMode: Boolean,
     private val csrfService: CsrfService? = null,
+    private val rateLimiter: RateLimiter = RateLimiter(),
+    private val trustProxyHeaders: Boolean = false,
 ) {
+    /**
+     * E02-B13 brute-force protection, evaluated in this order so nothing reveals whether the account exists:
+     *  1. per-IP limiter (in-memory) -> 429;
+     *  2. per e-mail-hash failure count from `login_attempts` (durable, last 15 min) or `users.locked_until` -> 429 + Retry-After;
+     *  3. Argon2id verification (always executed, dummy hash for unknown accounts);
+     *  4. the attempt is recorded and counters updated in a transaction that COMMITS even when the answer is 401.
+     */
     suspend fun login(call: ApplicationCall) {
         val request = call.receive<LoginRequest>()
         val email = request.email.trim()
@@ -65,56 +79,84 @@ class LoginService(
         if (email.isEmpty() || password.isEmpty() || clientKind == null || clientKind !in CLIENT_KINDS) {
             throw ProblemException.invalidCredentials()
         }
+        val ip = call.clientIp(trustProxyHeaders)
+        rateLimiter.require("auth-ip:$ip", AuthRateLimits.IP_PER_MINUTE, AuthRateLimits.IP_WINDOW)
+        val emailHash = Tokens.sha256(email.lowercase())
 
         val passwordChars = password.toCharArray()
         try {
-            val result = database.transaction(DbContext.Auth()) { connection ->
+            val outcome = database.transaction(DbContext.Auth()) { connection ->
+                val now = Instant.now()
                 val user = findUser(connection, email)
+                val lockedUntil = user?.lockedUntil?.takeIf { it.isAfter(now) }
+                    ?: recentFailures(connection, emailHash, now).takeIf { it >= AuthRateLimits.FAILED_LOGINS_BEFORE_LOCK }
+                        ?.let { now.plus(AuthRateLimits.FAILED_LOGIN_WINDOW) }
+                if (lockedUntil != null) {
+                    return@transaction LoginOutcome.Locked(java.time.Duration.between(now, lockedUntil).seconds + 1)
+                }
+
                 val candidateHash = user?.passwordHash ?: dummyPasswordHash
                 val passwordMatches = passwordHasher.verify(passwordChars, candidateHash)
-                if (user == null || !passwordMatches || user.status != "ACTIVE" || user.lockedUntil?.isAfter(Instant.now()) == true) {
-                    throw ProblemException.invalidCredentials()
+                val succeeded = user != null && passwordMatches && user.status == "ACTIVE"
+                recordAttempt(connection, emailHash, ip, succeeded)
+
+                if (!succeeded) {
+                    if (user != null) {
+                        val failures = user.failedLoginCount + 1
+                        val lock = if (failures % AuthRateLimits.FAILED_LOGINS_BEFORE_LOCK == 0) now.plus(AuthRateLimits.lockDuration(failures)) else null
+                        connection.prepareStatement("UPDATE app.users SET failed_login_count = ?, locked_until = ? WHERE id = ?").use { statement ->
+                            statement.setInt(1, failures)
+                            statement.setTimestamp(2, lock?.let(Timestamp::from))
+                            statement.setObject(3, user.id)
+                            statement.executeUpdate()
+                        }
+                        if (lock != null) {
+                            Audit.record(connection, "ACCOUNT_LOCKED", "USER", user.id, actorUserId = null, requestId = call.callId, metadata = mapOf("reason" to "FAILED_LOGINS"))
+                        }
+                    }
+                    return@transaction LoginOutcome.Rejected
                 }
-                if (!user.emailVerified) {
-                    return@transaction AuthResult(status = "EMAIL_VERIFICATION_REQUIRED")
+                if (!user!!.emailVerified) {
+                    return@transaction LoginOutcome.Authenticated(AuthResult(status = "EMAIL_VERIFICATION_REQUIRED"))
                 }
-
-                val now = Instant.now()
-                val accessExpires = now.plus(10, ChronoUnit.MINUTES)
-                val refreshExpires = now.plus(7, ChronoUnit.DAYS)
-                val absoluteExpires = now.plus(30, ChronoUnit.DAYS)
-                val sessionId = UUID.randomUUID()
-                val accessToken = Tokens.generate(Tokens.Kind.ACCESS)
-                val refreshToken = Tokens.generate(Tokens.Kind.REFRESH)
-                val csrfToken = if (clientKind == "WEB") Tokens.generate(Tokens.Kind.CSRF) else null
-
-                insertSession(connection, sessionId, user.id, clientKind, request.device, absoluteExpires, csrfToken)
-                insertAccessToken(connection, sessionId, accessToken, now, accessExpires)
-                insertRefreshToken(connection, sessionId, refreshToken, now, refreshExpires)
-
-                AuthResult(
-                    status = "AUTHENTICATED",
-                    sessionId = sessionId.toString(),
-                    tokens = TokenPair(
-                        accessToken = accessToken,
-                        accessTokenExpiresAt = accessExpires.toString(),
-                        refreshToken = refreshToken,
-                        refreshTokenExpiresAt = refreshExpires.toString(),
-                    ),
-                    csrfToken = csrfToken,
-                )
+                connection.prepareStatement("UPDATE app.users SET last_login_at = CURRENT_TIMESTAMP, failed_login_count = 0, locked_until = NULL WHERE id = ?").use { statement ->
+                    statement.setObject(1, user.id)
+                    statement.executeUpdate()
+                }
+                LoginOutcome.Authenticated(issueSession(connection, user.id, clientKind, request.device ?: LoginDevice(clientKind)))
             }
-            if (clientKind == "WEB" && result.tokens != null) {
-                appendTokenCookie(call, "vc_access", result.tokens.accessToken, 600, "/api")
-                appendTokenCookie(call, "vc_refresh", result.tokens.refreshToken, 604_800, "/api/v1/auth/refresh")
-                result.csrfToken?.let { appendCookie(call, "vc_csrf", it, 604_800, "/", httpOnly = false) }
-                call.respond(result.copy(tokens = null, csrfToken = null))
-            } else {
-                call.respond(result)
+            when (outcome) {
+                is LoginOutcome.Authenticated -> respondAuth(call, outcome.result, clientKind, io.ktor.http.HttpStatusCode.OK)
+                is LoginOutcome.Locked -> throw ProblemException.rateLimited(outcome.retryAfterSeconds)
+                LoginOutcome.Rejected -> throw ProblemException.invalidCredentials()
             }
         } finally {
             passwordChars.fill('\u0000')
         }
+    }
+
+    private fun recentFailures(connection: Connection, emailHash: ByteArray, now: Instant): Int =
+        connection.prepareStatement(
+            "SELECT count(*) FROM app.login_attempts WHERE email_hash = ? AND succeeded = false AND occurred_at > ?",
+        ).use { statement ->
+            statement.setBytes(1, emailHash)
+            statement.setTimestamp(2, Timestamp.from(now.minus(AuthRateLimits.FAILED_LOGIN_WINDOW)))
+            statement.executeQuery().use { rs -> rs.next(); rs.getInt(1) }
+        }
+
+    private fun recordAttempt(connection: Connection, emailHash: ByteArray, ip: String, succeeded: Boolean) {
+        connection.prepareStatement("INSERT INTO app.login_attempts (email_hash, ip, succeeded) VALUES (?, ?::inet, ?)").use { statement ->
+            statement.setBytes(1, emailHash)
+            statement.setString(2, ip.takeIf { it.matches(IP_PATTERN) })
+            statement.setBoolean(3, succeeded)
+            statement.executeUpdate()
+        }
+    }
+
+    private sealed interface LoginOutcome {
+        data class Authenticated(val result: AuthResult) : LoginOutcome
+        data class Locked(val retryAfterSeconds: Long) : LoginOutcome
+        data object Rejected : LoginOutcome
     }
 
     suspend fun refresh(call: ApplicationCall) {
@@ -161,6 +203,12 @@ class LoginService(
                 statement.setObject(2, current.id)
                 statement.executeUpdate()
             }
+            // Device list shows activity per session; a refresh is the cheapest reliable signal (every 10 min of use).
+            connection.prepareStatement("UPDATE app.sessions SET last_seen_at = ? WHERE id = ?").use { statement ->
+                statement.setTimestamp(1, Timestamp.from(now))
+                statement.setObject(2, current.sessionId)
+                statement.executeUpdate()
+            }
 
             RefreshOutcome.Issued(
                 AuthResult(
@@ -179,8 +227,8 @@ class LoginService(
         when (result) {
             is RefreshOutcome.Issued -> {
                 if (result.web && result.value.tokens != null) {
-                    appendTokenCookie(call, "vc_access", result.value.tokens.accessToken, 600, "/api")
-                    appendTokenCookie(call, "vc_refresh", result.value.tokens.refreshToken, 604_800, "/api/v1/auth/refresh")
+                    AuthCookies.append(call, AuthCookies.ACCESS, result.value.tokens.accessToken, 600, AuthCookies.ACCESS_PATH, httpOnly = true, devMode = devMode)
+                    AuthCookies.append(call, AuthCookies.REFRESH, result.value.tokens.refreshToken, 604_800, AuthCookies.REFRESH_PATH, httpOnly = true, devMode = devMode)
                     call.respond(result.value.copy(tokens = null))
                 } else {
                     call.respond(result.value)
@@ -213,15 +261,57 @@ class LoginService(
                 statement.executeUpdate()
             }
         }
-        clearCookie(call, "vc_access", "/api", httpOnly = true)
-        clearCookie(call, "vc_refresh", "/api/v1/auth/refresh", httpOnly = true)
-        clearCookie(call, "vc_csrf", "/", httpOnly = false)
+        AuthCookies.clearAll(call, devMode)
         call.respond(io.ktor.http.HttpStatusCode.NoContent)
+    }
+
+    /**
+     * Creates a session with its first access/refresh pair (and CSRF token for WEB) inside the
+     * caller's auth-mode transaction. Shared by login and invitation registration.
+     */
+    fun issueSession(connection: Connection, userId: UUID, clientKind: String, device: LoginDevice?): AuthResult {
+        require(clientKind in CLIENT_KINDS) { "unsupported client kind" }
+        val now = Instant.now()
+        val accessExpires = now.plus(10, ChronoUnit.MINUTES)
+        val refreshExpires = now.plus(7, ChronoUnit.DAYS)
+        val absoluteExpires = now.plus(30, ChronoUnit.DAYS)
+        val sessionId = UUID.randomUUID()
+        val accessToken = Tokens.generate(Tokens.Kind.ACCESS)
+        val refreshToken = Tokens.generate(Tokens.Kind.REFRESH)
+        val csrfToken = if (clientKind == "WEB") Tokens.generate(Tokens.Kind.CSRF) else null
+
+        insertSession(connection, sessionId, userId, clientKind, device, absoluteExpires, csrfToken)
+        insertAccessToken(connection, sessionId, accessToken, now, accessExpires)
+        insertRefreshToken(connection, sessionId, refreshToken, now, refreshExpires)
+
+        return AuthResult(
+            status = "AUTHENTICATED",
+            sessionId = sessionId.toString(),
+            tokens = TokenPair(
+                accessToken = accessToken,
+                accessTokenExpiresAt = accessExpires.toString(),
+                refreshToken = refreshToken,
+                refreshTokenExpiresAt = refreshExpires.toString(),
+            ),
+            csrfToken = csrfToken,
+        )
+    }
+
+    /** WEB gets HttpOnly cookies and a body without tokens; mobile gets the tokens in the body. */
+    suspend fun respondAuth(call: ApplicationCall, result: AuthResult, clientKind: String, status: io.ktor.http.HttpStatusCode) {
+        if (clientKind == "WEB" && result.tokens != null) {
+            AuthCookies.append(call, AuthCookies.ACCESS, result.tokens.accessToken, 600, AuthCookies.ACCESS_PATH, httpOnly = true, devMode = devMode)
+            AuthCookies.append(call, AuthCookies.REFRESH, result.tokens.refreshToken, 604_800, AuthCookies.REFRESH_PATH, httpOnly = true, devMode = devMode)
+            result.csrfToken?.let { AuthCookies.append(call, AuthCookies.CSRF, it, 604_800, AuthCookies.CSRF_PATH, httpOnly = false, devMode = devMode) }
+            call.respond(status, result.copy(tokens = null, csrfToken = null))
+        } else {
+            call.respond(status, result)
+        }
     }
 
     private fun findUser(connection: Connection, email: String): LoginUser? =
         connection.prepareStatement(
-            "SELECT id, password_hash, status, email_verified_at, locked_until FROM app.users WHERE email = ?",
+            "SELECT id, password_hash, status, email_verified_at, locked_until, failed_login_count FROM app.users WHERE email = ?",
         ).use { statement ->
             statement.setString(1, email)
             statement.executeQuery().use { result ->
@@ -232,6 +322,7 @@ class LoginService(
                     status = result.getString("status"),
                     emailVerified = result.getTimestamp("email_verified_at") != null,
                     lockedUntil = result.getTimestamp("locked_until")?.toInstant(),
+                    failedLoginCount = result.getInt("failed_login_count"),
                 )
             }
         }
@@ -343,29 +434,13 @@ class LoginService(
         }
     }
 
-    private fun appendTokenCookie(call: ApplicationCall, name: String, value: String, maxAgeSeconds: Int, path: String) {
-        appendCookie(call, name, value, maxAgeSeconds, path, httpOnly = true)
-    }
-
-    private fun appendCookie(call: ApplicationCall, name: String, value: String, maxAgeSeconds: Int, path: String, httpOnly: Boolean) {
-        val secure = if (devMode) "" else "; Secure"
-        val httpOnlyAttribute = if (httpOnly) "; HttpOnly" else ""
-        call.response.headers.append(
-            HttpHeaders.SetCookie,
-            "$name=$value; Max-Age=$maxAgeSeconds; Path=$path$httpOnlyAttribute; SameSite=Lax$secure",
-        )
-    }
-
-    private fun clearCookie(call: ApplicationCall, name: String, path: String, httpOnly: Boolean) {
-        appendCookie(call, name, "", 0, path, httpOnly)
-    }
-
     private data class LoginUser(
         val id: UUID,
         val passwordHash: String?,
         val status: String,
         val emailVerified: Boolean,
         val lockedUntil: Instant?,
+        val failedLoginCount: Int,
     )
 
     private data class RefreshRecord(
@@ -395,5 +470,6 @@ class LoginService(
 
     private companion object {
         val CLIENT_KINDS = setOf("WEB", "ANDROID", "IOS")
+        val IP_PATTERN = Regex("^[0-9A-Fa-f:.]{2,45}$")
     }
 }
