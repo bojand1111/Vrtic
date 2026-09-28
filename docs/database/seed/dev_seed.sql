@@ -6,7 +6,9 @@
 --
 --  Scenario: Happy Kids (Novi Sad: Bubamare, Leptirići), owner + admin + 3 teachers + 12 parents,
 --  and a second tenant "Sunčica" used ONLY for isolation tests.
---  No passwords: password_hash stays NULL until EPIC 02 hashes dev passwords from local config.
+--  No passwords in SQL. After loading, set a password for a seeded account with the DEV-only command:
+--    SEED_DEV_PASSWORD='<your dev password>' java -jar vrtic-backend-all.jar dev-set-password vlasnik@happykids.example.test
+--  (E02-D03: refuses outside APP_ENV=dev; the hash is Argon2id, the password never touches the repository).
 --  Never issues tokens or sessions.
 -- =====================================================================================
 
