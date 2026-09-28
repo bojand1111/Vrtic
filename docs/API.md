@@ -1,8 +1,8 @@
 # Vrtić Connect – REST API (ugovor)
 
-> **Status:** projektni dokument. Mašinski čitljiv izvor istine je `docs/openapi.yaml` (OpenAPI 3.1, 167 operacija). Ovaj dokument je njegov pregled na srpskom; identifikatori (path-ovi, polja, kodovi, `operationId`) su na engleskom i moraju se poklapati sa YAML-om. Nazivi polja prate kolone iz `docs/database/schema.sql` u camelCase obliku.
+> **Status:** projektni dokument. Mašinski čitljiv izvor istine je `docs/openapi.yaml` (OpenAPI 3.1, 179 operacija). Ovaj dokument je njegov pregled na srpskom; identifikatori (path-ovi, polja, kodovi, `operationId`) su na engleskom i moraju se poklapati sa YAML-om. Nazivi polja prate kolone iz `docs/database/schema.sql` u camelCase obliku.
 >
-> U trenutnom skeleton-u postoje `GET /health/live`, `GET /health/ready` i delimično implementirani `POST /auth/login`, `POST /auth/refresh`, `GET /auth/session` i `POST /auth/logout`; bez važeće sesije session endpoint vraća `401`. Sve ostalo je **projektovano, a nije implementirano** (v. poslednji odeljak).
+> Trenutno stanje implementacije je u `docs/openapi.yaml` (`x-status` po operaciji) i u odeljku [1.15 Stanje implementacije](#115-stanje-implementacije). Tabela u odeljku 4 je istorijski zapis iz EPIC 02 i nije ažurirana za kasnije module.
 
 Sadržaj:
 
@@ -74,7 +74,7 @@ Offset paginacija ne postoji (nestabilna je pri istovremenim izmenama i skupa na
 
 ### 1.5 Filtriranje i sortiranje (allowlist)
 
-- Svaki list endpoint navodi **eksplicitne** filtere (query parametre) i njihove tipove; nepoznati query parametri → `422 UNKNOWN_PARAMETER`.
+- Svaki list endpoint navodi **eksplicitne** filtere (query parametre) i njihove tipove. Nepoznati query parametri se u trenutnoj implementaciji **ignorišu** (kod `UNKNOWN_PARAMETER` ne postoji); neispravna vrednost poznatog parametra daje `422`.
 - `sort` je enum po endpointu (npr. `familyName:asc`, `createdAt:desc`); prva vrednost je podrazumevana. Nema slobodnog `sort=<kolona>`.
 - Pretraga (`search`) je prefiks po imenu, min. 2 znaka; bez slobodnog full-text upita u MVP-u.
 - Opsezi datuma imaju maksimum (npr. 92 dana za raspored, 366 za kalendar) → `422 RANGE_TOO_LARGE`.
@@ -135,6 +135,20 @@ Svaki odgovor nosi `X-Request-Id`; klijent može poslati svoj (UUID/ULID) i serv
 ### 1.14 Custom ekstenzije u YAML-u
 
 Svaka operacija ima `x-priority` (P0 pilot, P1 proširenje, P2 kasnije), `x-status` (`designed`, `implemented`, `implemented-stub`), `x-roles` (OWNER, ADMIN, TEACHER, PARENT, SUPER_ADMIN, SUPPORT) i, gde treba, `x-permissions` (CHILD_HEALTH_READ, CHILD_HEALTH_WRITE, ATTENDANCE_CORRECT, ANNOUNCEMENT_PUBLISH, PHOTO_PUBLISH, BILLING_MANAGE, MEMBER_MANAGE, REPORT_EXPORT), `x-requires-reauthentication`, `x-requires-mfa`. Uloge pripadaju **članstvu** u organizaciji; SUPPORT je platform korisnik sa aktivnim `support_access_grants` zapisom (opseg, rok, audit, read-only kad je dovoljno). Feature flag nije autorizacija: server proverava dozvole nezavisno od flaga.
+
+### 1.15 Stanje implementacije
+
+`x-status: implemented` znači da ruta postoji u `backend/` i da YAML opisuje ono što kod stvarno vraća; odstupanja specifična za jednu operaciju su u njenom `description` polju. `x-status: designed` znači da ruta još ne postoji. Opšta pravila implementacije, zajednička za sve operacije (ne ponavljaju se po operacijama):
+
+- **Null i podrazumevane vrednosti se izostavljaju.** Globalni JSON serializer radi sa `explicitNulls = false` i `encodeDefaults = false`: polje čija je vrednost `null` se ne šalje, kao ni polje jednako podrazumevanoj vrednosti iz Kotlin klase. Klijent odsutno polje tretira kao `null`. Izuzetak je `nextCursor` na `GET /auth/sessions` i `GET /platform/organizations`, koji je uvek prisutan (`null` na poslednjoj strani).
+- **Nepoznata polja u telu zahteva se ignorišu** (`ignoreUnknownKeys = true`), osim kod PATCH operacija koje to eksplicitno odbijaju (`422 UNKNOWN_FIELD` / `UNKNOWN_PROPERTY`, navedeno u opisu operacije).
+- **Paginacija.** `limit` (1–100, podrazumevano 50) i `cursor` se validiraju (`422`). Pravi cursor postoji samo na: `GET /auth/sessions`, `GET /platform/organizations` (samo uz `sort=createdAt:desc`), `GET /me/notifications`, `GET .../conversations`, `GET .../conversations/{id}/messages` i `GET .../audit-log`. Sve ostale liste vraćaju najviše `limit` stavki, a `nextCursor` je `null` ili izostavljen; poslati `cursor` se na njima ignoriše. Liste bez paginacije (`{ items }`) su naznačene u opisu.
+- **`sort`** se poštuje samo gde je u opisu operacije naveden dozvoljeni skup vrednosti; gde je parametar označen sa „Not implemented yet (ignored)”, koristi se fiksni redosled iz opisa.
+- **`Idempotency-Key`** se prihvata, ali se ne čuva niti proverava (ponovljeni zahtev se izvršava ponovo). Stvarna idempotentnost postoji samo za `commandId` (prisustvo) i `clientMessageId` (poruke).
+- **`If-Match`**: obavezan (`428 IF_MATCH_REQUIRED`) za obaveštenja, kalendar, jelovnike i izmenu deteta (dete prihvata i `version` u telu); kod dnevnih izmena rasporeda i otkazivanja odsustva proverava se samo ako je poslat.
+- **403 kodovi**: bez `detail` kada nedostaje permisija; `CSRF_INVALID`, `REAUTHENTICATION_REQUIRED`, `MFA_REQUIRED`, `MFA_ENROLLMENT_REQUIRED` i `ORGANIZATION_SUSPENDED` (v. `components/responses/Forbidden`).
+- **SUPPORT** pristup (support access grants) nije implementiran; `x-roles: SUPPORT` na implementiranim operacijama je projektna namera. Platformske rute prihvataju svakog platform admina sa MFA-verifikovanom sesijom (ostali dobijaju `404`).
+- Proširenja ugovora koja postoje samo u kodu su dodata u YAML (npr. `POST /employees`, `POST /children/{childId}/guardians`, `GET /parents`, `GET /schedules/expected`, `GET /schedules/changes`, `GET /platform/organizations/{organizationId}/feature-flags`, PUT alijasi za staratelje, ovlašćene osobe i šablone rasporeda).
 
 ---
 

@@ -117,3 +117,31 @@ Na zahtev vlasnika proizvoda urađen je prvi klikabilan krug poslovnih modula (d
 - Kontrolna tabla broji "kasni" samo za decu koja nisu stigla; ekran prisustva u "kasni" broji i decu koja su stigla sa zakašnjenjem (definicija iz ugovora). Brojke se zato mogu razlikovati.
 - Predlozi za šemu (nisu rađeni): DELETE na `attendance_visits` za čisto poništavanje dolaska; `deleted_at` ili DELETE na `menu_days`; trigger koji proverava da je veza roditelja vezana za PARENT članstvo (sada samo u aplikaciji).
 - Android/iOS nisu menjani ni građeni.
+
+## 8. Dopuna 28. 9. 2026. (kasno uveče): drugi krug
+
+**Implementirano (kod):**
+- Flyway `V6__schedule_exceptions_messaging_notifications.sql` (doslovno iz schema.sql): schedule_day_overrides, closure_days, schedule_change_log (append-only), notifications (RLS samo primalac), device_push_tokens, notification_deliveries (radnik), conversations, conversation_participants, messages.
+- E02-B11/B12: TOTP MFA (setup/confirm/verify, 10 kodova za oporavak, AES-256-GCM tajna sa `APP_DATA_KEY`; u DEV se koristi dokumentovani dev ključ, van DEV bez ključa aplikacija ne startuje), politika: OWNER i platformski admin moraju da podese MFA; sesija bez MFA radi samo MFA i osnovne /me rute.
+- Moj nalog (profil, lozinka, MFA, uređaji), platformska administracija (novi vrtić sa pozivnicom vlasniku, suspenzija, pretplata, funkcije), naplata za vlasnika (samo pregled).
+- Poruke roditelj-vaspitači / roditelj-uprava (učesnici se računaju iz potvrđenih veza i dodela), in-app notifikacije sa zvoncem (obaveštenja, odsustva, potvrđena veza, nova poruka).
+- Neradni dani, izmena rasporeda za jedan dan sa oznakom kasne izmene, dnevnik izmena, prioritet neradni dan > odsustvo > izmena > šablon u rasporedu, prisustvu i kontrolnoj tabli; izveštaj o prisustvu sa CSV izvozom (UTF-8 BOM, `;`), dnevnik aktivnosti (audit log).
+- `docs/openapi.yaml` usklađen sa kodom (179 operacija, 137 `implemented`), `docs/API.md` 1.15 "Stanje implementacije"; `rls_negative_tests.sql` proširen na V5/V6 tabele i više ne zavisi od postojećih sesija.
+
+**Izvršene provere (28. 9., ova mašina):**
+
+| Provera | Rezultat |
+|---|---|
+| `java -jar ... migrate` | PROŠLO: V6 primenjena ("now at version v6") |
+| `VRTIC_TEST_DB=1 ./gradlew build --rerun-tasks` | PROŠLO: 108 testova, 0 palih, 0 preskočenih (novi: Mfa, MfaCrypto sa RFC 6238 vektorima, PlatformAdmin, Messaging, Notifications, ScheduleExceptions, Reports) |
+| `rls_negative_tests.sql` kao app_runtime | PROŠLO: 49 tvrdnji |
+| Web `tsc`, `eslint src`, `vitest run` | PROŠLO: 15 fajlova, 62 testa |
+| `npx @redocly/cli@2 lint docs/openapi.yaml` | PROŠLO: 0 grešaka, 0 upozorenja |
+| Ručni klik-test u pregledaču | PROŠLO: vlasnik se posle lozinke upućuje na MFA; na nalogu vlasnika Sunčice: QR prikazan, kod izračunat po RFC 6238 iz prikazanog ključa prihvaćen, 10 kodova za oporavak, zatim svi ekrani iz menija bez greške u konzoli; roditelj poslao poruku vaspitačima (učesnici: oba roditelja i vaspitačica), vaspitačica vidi 1 nepročitanu notifikaciju u zvoncu i otvara razgovor; API log bez ERROR linija. MFA test-nalog je posle toga vraćen u stanje bez MFA. |
+
+**Nije izvršeno / otvoreno:**
+- QR kod nije skeniran pravim telefonom (kod je izračunat iz ključa sa ekrana).
+- Stvarno slanje e-pošte i push notifikacija (nema provajdera), fotografije i saglasnosti, zdravstveni profil deteta, plaćanje, mobilna aplikacija.
+- Mogući problemi pronađeni pri usklađivanju ugovora (nisu menjani): `GET /auth/session` vraća ulogu `KINDERGARTEN_OWNER` (web je normalizuje); pregled pozivnice vraća pun e-mail i `childGivenName` null; RELATIONSHIP_TAKEN je 422 pri povezivanju a 409 pri potvrdi; potvrda i opoziv veze roditelja ne traže reautentifikaciju; If-Match nije obavezan na izmeni dana i otkazivanju odsustva; Idempotency-Key se ne čuva; `applyNow` na pretplati se ignoriše; platformsko kreiranje vrtića vraća grešku ako slanje e-pošte padne posle upisa.
+- Korisnik sa dve uloge u istom vrtiću (npr. vaspitač i roditelj) radi sa višom ulogom, pa ne vidi razgovore svoje roditeljske uloge.
+- U deljenoj dev bazi ostala su dva test-vrtića (`fixture-a-0e20f737`, `fixture-b-0e20f737`) i nekoliko `extra-*`/`fixture-*` korisnika iz jednog prekinutog testa; vidljivi su samo platformskom adminu.

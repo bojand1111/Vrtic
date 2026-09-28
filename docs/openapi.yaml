@@ -1,6 +1,7 @@
 # =============================================================================
 #  Vrtić Connect (kindergarten-platform) — REST API contract (OpenAPI 3.1)
-#  STATUS: DESIGN. Only /health/* and the 501 auth stubs exist in the skeleton.
+#  STATUS: PARTIALLY IMPLEMENTED. Operations marked `x-status: implemented` exist in backend/;
+#  `x-status: designed` operations have no route yet. Implementation notes: docs/API.md "Stanje implementacije".
 #  Field names mirror docs/database/schema.sql columns in camelCase.
 #  Human-readable companion: docs/API.md (Serbian).
 # =============================================================================
@@ -14,8 +15,12 @@ info:
     platform operator).
 
 
-    **Status.** `GET /health/live`, `GET /health/ready`, `POST /auth/login`, `POST /auth/refresh`, `GET /auth/session` and `POST /auth/logout` have a
-    DB-backed partial implementation. Every other operation is marked `x-status: designed` and is NOT implemented.
+    **Status.** Every operation carries `x-status`: `implemented` means the route exists in the backend and this contract describes what
+    the code actually returns (implementation deviations are stated in the operation description); `designed` means there is no route
+    yet (files, photos, consents, privacy requests, health profiles, support access, usage, system logs, attendance offline sync, the
+    atomic week update, schedule preview/daily plans, and a few admin operations). Generic implementation conventions (null fields
+    omitted, pagination without a cursor on most lists, `Idempotency-Key` accepted but not enforced, unknown query parameters ignored)
+    are described once in docs/API.md, section "Stanje implementacije", instead of on every operation.
 
 
     **Conventions**
@@ -272,12 +277,17 @@ paths:
       summary: Login with e-mail and password
       description: >-
         Verifies credentials (Argon2id) and creates a session for the device. Web clients receive HttpOnly access/refresh cookies plus a
-        readable session-bound `vc_csrf` cookie; mobile clients receive `tokens`. Accounts with MFA get `status: MFA_REQUIRED` and a
-        `mfaChallengeToken`. Failed attempts are counted per e-mail hash and IP; generic `401 INVALID_CREDENTIALS` is returned whether the
-        account exists or not. The current implementation covers verified-user Argon2id login, opaque token issuance and cookie delivery;
-        MFA is a subsequent task. Brute force: every attempt is recorded in `login_attempts`; after 10 failures for the same
-        e-mail hash within 15 minutes (or while `locked_until` is in the future) the answer is `429` with `Retry-After`,
-        identical for unknown accounts; 20 requests per client IP per minute across `/auth/*`.
+        readable session-bound `vc_csrf` cookie; mobile clients receive `tokens`. Accounts with an enrolled TOTP method get `status:
+        MFA_REQUIRED` together with a limited session (cookies or tokens): until `POST /auth/mfa/totp/verify` succeeds only `GET
+        /auth/session`, `POST /auth/logout`, `POST /auth/mfa/totp/verify`, `GET /me`, `GET /me/memberships` and `PUT /me/locale` work, every
+        other route answers `403 MFA_REQUIRED`. No `mfaChallengeToken` is issued. `mfaEnrollmentRequired: true` means MFA is mandatory for
+        the account (OWNER membership) but not enrolled yet; tenant and platform routes then answer `403 MFA_ENROLLMENT_REQUIRED` until
+        `POST /auth/mfa/totp/confirm` succeeds. The client kind may be sent as `device.clientKind` or as a top-level `clientKind`; a missing
+        or unknown client kind, like missing credentials, answers the generic `401 INVALID_CREDENTIALS` (not `422`). An unverified e-mail
+        answers `200` with `status: EMAIL_VERIFICATION_REQUIRED` and no session. Failed attempts are counted per e-mail hash and IP;
+        generic `401 INVALID_CREDENTIALS` is returned whether the account exists or not. Brute force: every attempt is recorded in
+        `login_attempts`; after 10 failures for the same e-mail hash within 15 minutes (or while `locked_until` is in the future) the answer
+        is `429` with `Retry-After`, identical for unknown accounts; 20 requests per client IP per minute across `/auth/*`.
       security: []
       requestBody:
         required: true
@@ -307,7 +317,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: implemented-partial
+      x-status: implemented
       x-roles: []
   /auth/refresh:
     post:
@@ -349,7 +359,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: implemented-partial
+      x-status: implemented
       x-roles: []
   /auth/session:
     get:
@@ -359,8 +369,10 @@ paths:
       summary: Current session (web bootstrap)
       description: >-
         Returns the current session summary (user, session, client kind, MFA state, CSRF token in cookie mode, membership summary) so the
-        web admin can restore its state after a page load without a second round-trip. `401` (Problem) when there is no valid session. The current
-        implementation returns the authenticated user and active membership summary; the CSRF token is delivered in the readable `vc_csrf` cookie.
+        web admin can restore its state after a page load without a second round-trip. `401` (Problem) when there is no valid session. The
+        implementation returns `user` (with the ACTIVE membership summary inside `user.memberships`), the session identifiers and the MFA
+        state; there is no top-level `memberships` array and no `csrfToken` in the body (the CSRF token is delivered in the readable `vc_csrf`
+        cookie). Allowed for a session that still has to pass MFA verification.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -388,7 +400,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: implemented-partial
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -434,7 +446,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: implemented-partial
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -758,7 +770,8 @@ paths:
       summary: Start TOTP enrollment
       description: >-
         Generates a TOTP secret (envelope-encrypted at rest) and returns the provisioning URI once. Must be confirmed within 15 min.
-        Mandatory for SUPER_ADMIN, OWNER and support users; optional for others.
+        Mandatory for SUPER_ADMIN, OWNER and support users; optional for others. Requires a recent login or re-authentication (5 min),
+        otherwise `403 REAUTHENTICATION_REQUIRED`. Already enrolled -> `409 MFA_ALREADY_ENABLED`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -786,7 +799,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -801,7 +814,10 @@ paths:
       tags:
         - Auth
       summary: Confirm TOTP enrollment
-      description: Verifies the first code from the authenticator app, activates MFA and returns recovery codes (shown once).
+      description: >-
+        Verifies the first code from the authenticator app, activates MFA and returns recovery codes (shown once). Errors: `409
+        MFA_ALREADY_ENABLED`, `409 MFA_SETUP_NOT_STARTED`, `409 MFA_SETUP_EXPIRED` (setup older than 15 min); a malformed or wrong code ->
+        `422` with `errors[].field = code` and code `INVALID_FORMAT` or `INVALID_CODE`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -835,7 +851,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -850,9 +866,16 @@ paths:
         - Auth
       summary: Complete login with TOTP
       description: >-
-        Second step of login: exchanges the `mfaChallengeToken` and a TOTP or recovery code for a session. Five failures invalidate the
-        challenge.
-      security: []
+        Second step of login. The implementation has no challenge token: the limited session returned by `POST /auth/login` (`status:
+        MFA_REQUIRED`) calls this operation with its own credentials (cookie mode also needs `X-CSRF-Token`) and a TOTP code (6 digits) or
+        a recovery code. Success stamps `mfa_verified_at` on the same session and returns `status: AUTHENTICATED` with `sessionId` (no new
+        tokens). `mfaChallengeToken` in the body is accepted and ignored. Wrong or malformed code -> `422` (`errors[].field = code`,
+        `INVALID_CODE` / `INVALID_FORMAT`); no enrolled method -> `409 MFA_NOT_ENABLED`; 10 attempts per user in 15 min, then `429`.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
       requestBody:
         required: true
         content:
@@ -868,6 +891,8 @@ paths:
                 $ref: "#/components/schemas/AuthResult"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -879,15 +904,23 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
-      x-roles: []
+      x-status: implemented
+      x-roles:
+        - OWNER
+        - ADMIN
+        - TEACHER
+        - PARENT
+        - SUPER_ADMIN
+        - SUPPORT
   /auth/mfa/recovery-codes/regenerate:
     post:
       operationId: regenerateRecoveryCodes
       tags:
         - Auth
       summary: Regenerate recovery codes
-      description: Invalidates all unused recovery codes and issues a new set. Requires re-authentication.
+      description: >-
+        Invalidates all unused recovery codes and issues a new set. Requires a recent login or re-authentication (`403
+        REAUTHENTICATION_REQUIRED`); no enrolled method -> `409 MFA_NOT_ENABLED`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -915,7 +948,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -931,8 +964,10 @@ paths:
         - Auth
       summary: Register a device push token
       description: >-
-        Registers (or refreshes) an FCM/APNs token bound to the current session. Re-registering the same token updates `lastSeenAt`. Tokens
-        are removed automatically when the provider reports them invalid or the session is revoked.
+        Registers (or refreshes) an FCM/APNs token bound to the current session. Re-registering the same token of the same user updates
+        `lastSeenAt`, the session and `appVersion` and answers `200` with the existing registration (a new token answers `201`). A token
+        registered to another account -> `409 PUSH_TOKEN_REGISTERED_TO_ANOTHER_USER`. `token` is 16 to 4096 characters, `appVersion` at most
+        32 (`422` otherwise). Tokens are removed automatically when the provider reports them invalid or the session is revoked.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -945,6 +980,12 @@ paths:
             schema:
               $ref: "#/components/schemas/PushTokenRegistration"
       responses:
+        "200":
+          description: The same token was already registered by the caller; registration refreshed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushToken"
         "201":
           description: Created.
           content:
@@ -966,7 +1007,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -1005,7 +1046,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -1264,7 +1305,11 @@ paths:
       tags:
         - Me
       summary: List notification inbox
-      description: In-app inbox across all tenants of the caller. Items contain only i18n keys, arguments and entity ids.
+      description: >-
+        In-app inbox across all tenants of the caller. Items contain only i18n keys, arguments and entity ids. Tenant notifications are
+        listed only while the caller still has an ACTIVE membership in that organization. Real cursor pagination (`createdAt` desc); the
+        page also carries `unreadCount` (total unread, independent of filters and page). Invalid `kind`, `sort` or `organizationId` ->
+        `422`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -1336,7 +1381,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -1350,7 +1395,9 @@ paths:
       tags:
         - Me
       summary: Mark notifications as read
-      description: Marks the given notifications (or all) as read. Idempotent.
+      description: >-
+        Marks the given notifications (or all with `all: true`) as read and returns the remaining unread count. Idempotent; unknown or
+        foreign ids are ignored. Neither `notificationIds` nor `all: true` -> `422 REQUIRED`; more than 200 ids -> `422 TOO_MANY`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -1384,7 +1431,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -1469,7 +1516,9 @@ paths:
       summary: Create an organization
       description: >-
         Creates a tenant with default settings, a TRIAL subscription on the given plan and an OWNER invitation e-mail. Duplicate slug → `409
-        SLUG_TAKEN`.
+        SLUG_TAKEN`. Defaults: `countryCode` RS, `timezone` Europe/Belgrade, `defaultLocale` sr-Latn. Unknown or inactive `planId` -> `422`
+        (`NOT_FOUND` / `INACTIVE` on field `planId`). The invitation e-mail is sent after commit; a failing mail provider surfaces as an
+        error although the organization exists.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -1504,7 +1553,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - SUPER_ADMIN
       x-requires-mfa: true
@@ -1542,7 +1591,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - SUPER_ADMIN
         - SUPPORT
@@ -1597,7 +1646,11 @@ paths:
       tags:
         - Platform
       summary: Suspend an organization
-      description: "Sets status SUSPENDED: tenant users can log in but every tenant endpoint answers `403 ORGANIZATION_SUSPENDED`. No data is deleted."
+      description: >-
+        Sets status SUSPENDED: tenant users can log in but every tenant endpoint answers `403 ORGANIZATION_SUSPENDED` (only members of that
+        organization see this; everyone else keeps getting `404`). No data is deleted. Requires a recent login or re-authentication (`403
+        REAUTHENTICATION_REQUIRED`). Already suspended -> `409 ORGANIZATION_ALREADY_SUSPENDED`; archived -> `409 ORGANIZATION_ARCHIVED`.
+        The implementation accepts any platform admin (no SUPER_ADMIN/SUPPORT distinction yet); non-admins get `404`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -1632,7 +1685,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - SUPER_ADMIN
       x-requires-reauthentication: true
@@ -1643,7 +1696,9 @@ paths:
       tags:
         - Platform
       summary: Reactivate an organization
-      description: Sets status back to ACTIVE.
+      description: >-
+        Sets status back to ACTIVE. Already active -> `409 ORGANIZATION_ALREADY_ACTIVE`; archived -> `409 ORGANIZATION_ARCHIVED`. `reason`
+        (3 to 500 characters) is validated like on deactivate.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -1678,7 +1733,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - SUPER_ADMIN
       x-requires-mfa: true
@@ -1688,7 +1743,9 @@ paths:
       tags:
         - Platform
       summary: List plans
-      description: Plan catalogue with all versions.
+      description: >-
+        Plan catalogue with all versions, ordered by code and version (newest first). `activeOnly` defaults to `true`; only `true` or
+        `false` are accepted (`422` otherwise). Returns up to `limit` rows; `nextCursor` is always `null` (no cursor).
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -1736,7 +1793,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - SUPER_ADMIN
         - SUPPORT
@@ -1892,7 +1949,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - SUPER_ADMIN
         - SUPPORT
@@ -1938,7 +1995,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - SUPER_ADMIN
       x-requires-mfa: true
@@ -1949,7 +2006,10 @@ paths:
       summary: Change plan or status of a subscription
       description: >-
         Manual plan change, status transition (ACTIVE/PAST_DUE/CANCELLED), period extension. Every change is appended to
-        `subscription_events`. Downgrades never delete tenant data.
+        `subscription_events`. Downgrades never delete tenant data. A plan change applies immediately: `applyNow` is accepted but ignored
+        (scheduling for the next period is not implemented). At least one of `planId`, `status`, `cancelAtPeriodEnd`, `currentPeriodEnd`
+        is required (`422 NOTHING_TO_CHANGE`); `reason` is 3 to 500 characters. CANCELLED is terminal: create a new subscription with
+        POST. No current subscription -> `404`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -1984,7 +2044,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - SUPER_ADMIN
       x-requires-mfa: true
@@ -2028,7 +2088,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - SUPER_ADMIN
         - SUPPORT
@@ -2130,7 +2190,9 @@ paths:
       tags:
         - Platform
       summary: Set a tenant feature override
-      description: Enables or disables a feature for one tenant regardless of its plan (kill switch still wins).
+      description: >-
+        Enables or disables a feature for one tenant regardless of its plan (kill switch still wins). `enabled` and `reason` (3 to 500
+        characters) are required; `expiresAt` must be in the future (`422 MUST_BE_FUTURE`). Unknown flag or organization -> `404`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -2166,7 +2228,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - SUPER_ADMIN
       x-requires-mfa: true
@@ -2175,7 +2237,9 @@ paths:
       tags:
         - Platform
       summary: Remove a tenant feature override
-      description: The plan entitlement / default applies again.
+      description: >-
+        The plan entitlement / default applies again. The override row is ended (`expires_at = now()`) rather than deleted; no active
+        override -> `404`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -2201,7 +2265,44 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
+      x-roles:
+        - SUPER_ADMIN
+      x-requires-mfa: true
+  /platform/organizations/{organizationId}/feature-flags:
+    get:
+      operationId: platformGetOrganizationFeatureFlags
+      tags:
+        - Platform
+      summary: Effective feature flags of one tenant
+      description: >-
+        The effective flags of one organization as the platform sees them, resolved exactly like `GET
+        /organizations/{organizationId}/feature-flags` (kill switch, tenant override, plan entitlement, default). Unknown organization ->
+        `404`.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PathOrganizationId"
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EffectiveFeatureFlags"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+      x-priority: P1
+      x-status: implemented
       x-roles:
         - SUPER_ADMIN
       x-requires-mfa: true
@@ -2697,7 +2798,9 @@ paths:
       summary: Admin dashboard summary
       description: >-
         Counters for a date (organization timezone) using the same definitions as the teacher daily overview, per-location and per-group
-        breakdown, latest announcements and upcoming events.
+        breakdown, latest announcements and upcoming events. Requires `REPORT_VIEW`. `latestAnnouncements` holds at most 5 published,
+        unexpired announcements (newest first) and `upcomingEvents` at most 5 events ending on or after the date, both in a reduced shape;
+        `subscription` is not returned.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -2733,7 +2836,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -2744,7 +2847,9 @@ paths:
       tags:
         - Organization
       summary: View current subscription
-      description: Read-only view of plan, status and billing period. Payments are not handled in the app.
+      description: >-
+        Read-only view of plan, status and billing period. Payments are not handled in the app. Requires `BILLING_VIEW` (OWNER) or
+        `BILLING_MANAGE`; `404` when the organization has no current subscription.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -2772,7 +2877,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -2815,7 +2920,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -2828,7 +2933,9 @@ paths:
       tags:
         - Structure
       summary: List locations
-      description: Locations of the organization. Parents see only locations of their children's groups.
+      description: >-
+        Locations of the organization. Parents see only locations of their children's groups. Implementation: `status` defaults to ACTIVE;
+        ordered by name. A PARENT sees only the locations of groups of their children; TEACHER, ADMIN and OWNER see all.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -2847,7 +2954,7 @@ paths:
         - name: sort
           in: query
           required: false
-          description: "Sort order (allowlist). Default: `name:asc`."
+          description: "Sort order (allowlist). Default: `name:asc`. Not implemented yet (ignored)."
           schema:
             type: string
             enum:
@@ -2878,7 +2985,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -2890,7 +2997,9 @@ paths:
       tags:
         - Structure
       summary: Create a location
-      description: Duplicate name (case-insensitive) → `409 LOCATION_NAME_TAKEN`.
+      description: >-
+        Duplicate name (case-insensitive) → `409 LOCATION_NAME_TAKEN`. Requires `LOCATION_MANAGE`. Duplicate name -> `409
+        LOCATION_NAME_TAKEN`; `countryCode` must be two upper-case letters (`422`).
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -2926,7 +3035,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -2965,7 +3074,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -2977,7 +3086,10 @@ paths:
       tags:
         - Structure
       summary: Update a location
-      description: Partial update. Setting INACTIVE requires no ACTIVE groups (`409 LOCATION_HAS_ACTIVE_GROUPS`).
+      description: >-
+        Partial update. Setting INACTIVE requires no ACTIVE groups (`409 LOCATION_HAS_ACTIVE_GROUPS`). Requires `LOCATION_MANAGE`. Empty
+        body -> `422 EMPTY`; setting INACTIVE while the location has ACTIVE groups -> `409 LOCATION_HAS_ACTIVE_GROUPS`; duplicate name ->
+        `409 LOCATION_NAME_TAKEN`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -3013,7 +3125,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -3022,7 +3134,10 @@ paths:
       tags:
         - Structure
       summary: Soft-delete a location
-      description: Sets `deletedAt`. Fails with `409 LOCATION_IN_USE` when groups or future closure days reference it.
+      description: >-
+        Sets `deletedAt`. Fails with `409 LOCATION_IN_USE` when groups or future closure days reference it. Implementation: requires
+        `LOCATION_MANAGE` (OWNER and ADMIN); any non-deleted group at the location -> `409 LOCATION_IN_USE` (closure days are not
+        checked).
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -3048,9 +3163,10 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
+        - ADMIN
   /organizations/{organizationId}/groups:
     get:
       operationId: listGroups
@@ -3059,7 +3175,8 @@ paths:
       summary: List groups
       description: >-
         Groups with today's active enrollment count. TEACHER: only groups with an active assignment on the relevant date. PARENT: only
-        children with a CONFIRMED guardian link. Anything outside that scope → `404`.
+        children with a CONFIRMED guardian link. Anything outside that scope → `404`. Implementation: ordered by name; TEACHER sees only
+        groups with an assignment valid today, PARENT only the groups of their children.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -3086,7 +3203,7 @@ paths:
         - name: sort
           in: query
           required: false
-          description: "Sort order (allowlist). Default: `name:asc`."
+          description: "Sort order (allowlist). Default: `name:asc`. Not implemented yet (ignored)."
           schema:
             type: string
             enum:
@@ -3117,7 +3234,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -3129,7 +3246,9 @@ paths:
       tags:
         - Structure
       summary: Create a group
-      description: Duplicate name within the location → `409 GROUP_NAME_TAKEN`.
+      description: >-
+        Duplicate name within the location → `409 GROUP_NAME_TAKEN`. Requires `GROUP_MANAGE`. Unknown location -> `422` (`locationId`
+        `NOT_FOUND`); duplicate name in the location -> `409 GROUP_NAME_TAKEN`; ages 0..120 months, capacity 1..500 (`422`).
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -3165,7 +3284,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -3176,8 +3295,8 @@ paths:
         - Structure
       summary: Get a group
       description: >-
-        Group details. TEACHER: only groups with an active assignment on the relevant date. PARENT: only children with a CONFIRMED guardian
-        link. Anything outside that scope → `404`.
+        Group details. TEACHER: only groups with an active assignment on the relevant date. PARENT: only children with a CONFIRMED
+        guardian link. Anything outside that scope → `404`. Group outside the caller's scope -> `404`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -3206,7 +3325,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -3218,7 +3337,10 @@ paths:
       tags:
         - Structure
       summary: Update a group
-      description: Partial update. Capacity below current enrollment → `422 CAPACITY_BELOW_ENROLLMENT`.
+      description: >-
+        Partial update. Capacity below current enrollment → `422 CAPACITY_BELOW_ENROLLMENT`. Requires `GROUP_MANAGE`. Duplicate name ->
+        `409 GROUP_NAME_TAKEN`; setting INACTIVE with PLANNED/ACTIVE enrollments -> `409 GROUP_HAS_ENROLLMENTS`; capacity below the
+        current enrollment -> `422 CAPACITY_BELOW_ENROLLMENT`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -3254,7 +3376,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -3263,7 +3385,10 @@ paths:
       tags:
         - Structure
       summary: Soft-delete a group
-      description: Sets `deletedAt`. Fails with `409 GROUP_HAS_ENROLLMENTS` while PLANNED/ACTIVE enrollments exist.
+      description: >-
+        Sets `deletedAt`. Fails with `409 GROUP_HAS_ENROLLMENTS` while PLANNED/ACTIVE enrollments exist. Implementation: requires
+        `GROUP_MANAGE` (OWNER and ADMIN); PLANNED/ACTIVE enrollments -> `409 GROUP_HAS_ENROLLMENTS`; the group's teacher assignments are
+        revoked with it.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -3289,16 +3414,19 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
+        - ADMIN
   /organizations/{organizationId}/employees:
     get:
       operationId: listEmployees
       tags:
         - Members
       summary: List employees
-      description: Staff profiles (OWNER/ADMIN/TEACHER memberships). Teachers see colleagues' names only (no e-mail/phone).
+      description: >-
+        Staff profiles (OWNER/ADMIN/TEACHER memberships). Teachers see colleagues' names only (no e-mail/phone). Implementation: requires
+        `MEMBER_MANAGE` (teachers get `403`); ordered by display name.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -3338,7 +3466,7 @@ paths:
         - name: sort
           in: query
           required: false
-          description: "Sort order (allowlist). Default: `displayName:asc`."
+          description: "Sort order (allowlist). Default: `displayName:asc`. Not implemented yet (ignored)."
           schema:
             type: string
             enum:
@@ -3369,19 +3497,69 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-        - TEACHER
-        - SUPPORT
+    post:
+      operationId: createEmployee
+      tags:
+        - Members
+      summary: Create a staff profile for an existing membership
+      description: >-
+        Creates the employee profile for an ACTIVE OWNER/ADMIN/TEACHER membership that has none yet (e.g. the OWNER created through
+        `POST /platform/organizations`, whose invitation creates only the membership). Requires `MEMBER_MANAGE`. Unknown membership ->
+        `422` (`membershipId` `NOT_FOUND`); PARENT or not ACTIVE -> `422` (`membershipId` `NOT_STAFF`); a profile already exists -> `409
+        EMPLOYEE_EXISTS`; unknown `primaryLocationId` -> `422` (`NOT_FOUND`). Audited.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PathOrganizationId"
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmployeeCreate"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employee"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+      x-priority: P0
+      x-status: implemented
+      x-roles:
+        - OWNER
+        - ADMIN
+      x-permissions:
+        - MEMBER_MANAGE
   /organizations/{organizationId}/employees/{employeeId}:
     get:
       operationId: getEmployee
       tags:
         - Members
       summary: Get an employee
-      description: Employee profile with membership status and permissions.
+      description: >-
+        Employee profile with membership status and permissions. Implementation: members with `MEMBER_MANAGE` read any profile; any other
+        member only their own (others -> `404`).
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -3410,7 +3588,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -3421,7 +3599,9 @@ paths:
       tags:
         - Members
       summary: Update an employee profile
-      description: Display name, job title, phone, primary location, employment dates.
+      description: >-
+        Display name, job title, phone, primary location, employment dates. Empty body -> `422 EMPTY`; `endedAt` before `startedAt` ->
+        `422 MUST_BE_AFTER_START`; unknown `primaryLocationId` -> `422 NOT_FOUND`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -3457,7 +3637,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -3469,7 +3649,9 @@ paths:
       tags:
         - Members
       summary: List invitations
-      description: Staff and guardian invitations with derived status.
+      description: >-
+        Staff and guardian invitations with derived status. Implementation: requires `MEMBER_INVITE`; newest first; responses include
+        `childName` for PARENT invitations.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -3504,7 +3686,7 @@ paths:
         - name: sort
           in: query
           required: false
-          description: "Sort order (allowlist). Default: `createdAt:desc`."
+          description: "Sort order (allowlist). Default: `createdAt:desc`. Not implemented yet (ignored)."
           schema:
             type: string
             enum:
@@ -3534,7 +3716,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -3547,6 +3729,11 @@ paths:
       description: >-
         Creates an INVITED membership placeholder and sends an invitation e-mail (7-day validity). ADMIN may invite TEACHER/ADMIN; only
         OWNER may invite OWNER (`403 ROLE_ESCALATION`). Existing active membership with that role → `409 MEMBERSHIP_EXISTS`.
+        Implementation: requires `MEMBER_INVITE`. Also invites parents: role PARENT with a required `childId` (a guardian link is created
+        on acceptance); `displayName` and `jobTitle` are accepted but not stored, `primaryLocationId` and `permissions` are ignored. OWNER
+        cannot invite OWNER and ADMIN can invite only TEACHER and PARENT (`403 ROLE_ESCALATION`). A pending invitation for the same
+        e-mail, role and child -> `409 INVITATION_PENDING`; the e-mail already has a membership (non-PARENT) -> `409 MEMBERSHIP_EXISTS`;
+        the parent is already linked to the child -> `409 GUARDIAN_LINK_EXISTS`; unknown child -> `404`. The e-mail is sent after commit.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -3582,19 +3769,20 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-      x-permissions:
-        - MEMBER_MANAGE
   /organizations/{organizationId}/invitations/{invitationId}/revoke:
     post:
       operationId: revokeInvitation
       tags:
         - Members
       summary: Revoke an invitation
-      description: Invalidates the token. Accepted invitations cannot be revoked (`409 INVITATION_ALREADY_ACCEPTED`); revoke the membership instead.
+      description: >-
+        Invalidates the token. Accepted invitations cannot be revoked (`409 INVITATION_ALREADY_ACCEPTED`); revoke the membership instead.
+        Implementation: requires `MEMBER_INVITE`. Already accepted -> `409 INVITATION_ALREADY_ACCEPTED`; already revoked -> `409
+        INVITATION_ALREADY_REVOKED`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -3624,19 +3812,19 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-      x-permissions:
-        - MEMBER_MANAGE
   /organizations/{organizationId}/memberships:
     get:
       operationId: listMemberships
       tags:
         - Members
       summary: List memberships
-      description: All memberships of the organization (staff and parents). Used by the "Parents" screen with `role=PARENT`.
+      description: >-
+        All memberships of the organization (staff and parents). Used by the "Parents" screen with `role=PARENT`. Implementation: requires
+        `MEMBER_MANAGE` or `GUARDIAN_MANAGE`; `search` 2..100 characters; ordered by family and given name.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -3672,7 +3860,7 @@ paths:
         - name: sort
           in: query
           required: false
-          description: "Sort order (allowlist). Default: `familyName:asc`."
+          description: "Sort order (allowlist). Default: `familyName:asc`. Not implemented yet (ignored)."
           schema:
             type: string
             enum:
@@ -3703,7 +3891,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -3768,7 +3956,10 @@ paths:
       description: >-
         Permanently ends the membership: teacher assignments are closed, guardian links revoked, conversation participation ended, push
         notifications for this tenant stopped. Cannot revoke the last active OWNER (`409 LAST_OWNER`); ADMIN cannot revoke OWNER (`403
-        ROLE_ESCALATION`).
+        ROLE_ESCALATION`). Implementation: requires `MEMBER_REVOKE` and a recent login or re-authentication (`403
+        REAUTHENTICATION_REQUIRED`); `reason` 3..500 characters (`422 INVALID_LENGTH`). OWNER memberships -> `409 OWNER_NOT_REVOCABLE`;
+        own membership -> `409 CANNOT_REVOKE_SELF`; already revoked -> `409 ALREADY_REVOKED`. `LAST_OWNER` and `ROLE_ESCALATION` are not
+        produced by the current implementation.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -3804,12 +3995,10 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-      x-permissions:
-        - MEMBER_MANAGE
       x-requires-reauthentication: true
   /organizations/{organizationId}/group-teacher-assignments:
     get:
@@ -3817,7 +4006,10 @@ paths:
       tags:
         - Members
       summary: List teacher–group assignments
-      description: Assignments with validity periods. Teachers see only their own.
+      description: >-
+        Assignments with validity periods. Teachers see only their own. Implementation: members with `TEACHER_ASSIGN` see all assignments,
+        a TEACHER only their own, PARENT -> `403`. `includeRevoked` accepts only `true`/`false` (`422` otherwise). Ordered by `validFrom`
+        desc.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -3858,7 +4050,7 @@ paths:
         - name: sort
           in: query
           required: false
-          description: "Sort order (allowlist). Default: `validFrom:desc`."
+          description: "Sort order (allowlist). Default: `validFrom:desc`. Not implemented yet (ignored)."
           schema:
             type: string
             enum:
@@ -3888,18 +4080,19 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
         - TEACHER
-        - SUPPORT
     post:
       operationId: createGroupTeacherAssignment
       tags:
         - Members
       summary: Assign a teacher to a group
-      description: Creates a time-boxed assignment. Overlap for the same employee/group → `409 ASSIGNMENT_OVERLAP`.
+      description: >-
+        Creates a time-boxed assignment. Overlap for the same employee/group → `409 ASSIGNMENT_OVERLAP`. Requires `TEACHER_ASSIGN`.
+        Unknown group or no active staff member -> `422` (`groupId` / `employeeId` `NOT_FOUND`).
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -3935,7 +4128,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -3945,7 +4138,9 @@ paths:
       tags:
         - Members
       summary: Revoke a teacher–group assignment
-      description: Sets `revokedAt`; the teacher loses group access on the next request. History stays.
+      description: >-
+        Sets `revokedAt`; the teacher loses group access on the next request. History stays. Requires `TEACHER_ASSIGN`. Already revoked ->
+        `409 ASSIGNMENT_ALREADY_REVOKED`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -3971,7 +4166,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -3983,7 +4178,9 @@ paths:
       summary: List children
       description: >-
         Child summaries with current enrollment. **No health data.** TEACHER: only groups with an active assignment on the relevant date.
-        PARENT: only children with a CONFIRMED guardian link. Anything outside that scope → `404`.
+        PARENT: only children with a CONFIRMED guardian link. Anything outside that scope → `404`. Implementation: `status` defaults to
+        ACTIVE, `search` 2..100 characters, `sort` one of `familyName:asc`, `givenName:asc`, `dateOfBirth:asc` (`422` otherwise); scope is
+        evaluated on `onDate` (default today).
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -4067,7 +4264,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -4079,7 +4276,9 @@ paths:
       tags:
         - Children
       summary: Create a child
-      description: Creates a child profile, optionally with an initial enrollment. Children are never linked across organizations.
+      description: >-
+        Creates a child profile, optionally with an initial enrollment. Children are never linked across organizations. Requires
+        `CHILD_MANAGE`. Returns `ETag`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -4118,7 +4317,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -4129,9 +4328,9 @@ paths:
         - Children
       summary: Get a child
       description: >-
-        Child detail with enrollments, guardians and pickup persons. **No health data** — use the health endpoint. TEACHER: only groups with
-        an active assignment on the relevant date. PARENT: only children with a CONFIRMED guardian link. Anything outside that scope →
-        `404`.
+        Child detail with enrollments, guardians and pickup persons. **No health data** — use the health endpoint. TEACHER: only groups
+        with an active assignment on the relevant date. PARENT: only children with a CONFIRMED guardian link. Anything outside that scope
+        → `404`. Returns `ETag`. Child outside the caller's scope -> `404`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -4163,7 +4362,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -4175,7 +4374,11 @@ paths:
       tags:
         - Children
       summary: Update a child
-      description: Partial update with optimistic concurrency.
+      description: >-
+        Partial update with optimistic concurrency. Implementation: requires `CHILD_MANAGE`. The expected version comes from `If-Match`
+        or, alternatively, from a `version` field in the body; neither -> `428 IF_MATCH_REQUIRED`; mismatch -> `409 VERSION_MISMATCH` with
+        `currentVersion`. Unknown fields -> `422 UNKNOWN_FIELD`; a non-null `photoFileId` -> `422 NOT_SUPPORTED` (files are not
+        implemented).
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -4217,7 +4420,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -4262,12 +4465,61 @@ paths:
         - OWNER
       x-requires-reauthentication: true
   /organizations/{organizationId}/children/{childId}/enrollments:
+    get:
+      operationId: listChildEnrollments
+      tags:
+        - Children
+      summary: Enrollment history of a child
+      description: >-
+        All enrollments of the child, newest `validFrom` first, with the status derived for today (PLANNED/ACTIVE/ENDED/CANCELLED).
+        Requires `CHILD_READ` and the child in the caller's scope, otherwise `404`. Not paginated: returns all rows as `{ items }`.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PathOrganizationId"
+        - $ref: "#/components/parameters/PathChildId"
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Enrollment"
+                    description: Enrollments.
+                required:
+                  - items
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+      x-priority: P0
+      x-status: implemented
+      x-roles:
+        - OWNER
+        - ADMIN
+        - TEACHER
+        - PARENT
     post:
       operationId: createEnrollment
       tags:
         - Children
       summary: Enroll a child in a group
-      description: Creates a PLANNED (future) or ACTIVE enrollment. Overlap → `409 ENROLLMENT_OVERLAP`; capacity exceeded → `409 GROUP_FULL`.
+      description: >-
+        Creates a PLANNED (future) or ACTIVE enrollment. Overlap → `409 ENROLLMENT_OVERLAP`; capacity exceeded → `409 GROUP_FULL`.
+        Requires `CHILD_MANAGE`. `endCurrentEnrollment: true` ends the enrollment covering the day before `validFrom` (end reason MOVED)
+        in the same transaction.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -4304,7 +4556,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -4314,7 +4566,11 @@ paths:
       tags:
         - Children
       summary: End or cancel an enrollment
-      description: Sets `validTo` (ENDED) or cancels a PLANNED enrollment. Future daily plans after `validTo` are recomputed; past ones are untouched.
+      description: >-
+        Sets `validTo` (ENDED) or cancels a PLANNED enrollment. Future daily plans after `validTo` are recomputed; past ones are
+        untouched. Implementation: requires `CHILD_MANAGE`. Already ENDED/CANCELLED -> `409 ENROLLMENT_NOT_ACTIVE`. `validTo` before
+        `validFrom`: an enrollment that has not started yet is CANCELLED, otherwise `422 BEFORE_START`. `validTo` in the past without
+        `ATTENDANCE_CORRECT` -> `422 IN_PAST`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -4350,7 +4606,58 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
+      x-roles:
+        - OWNER
+        - ADMIN
+  /organizations/{organizationId}/children/{childId}/guardians:
+    post:
+      operationId: linkGuardian
+      tags:
+        - Children
+      summary: Link an existing parent membership to a child
+      description: >-
+        Staff links an existing ACTIVE PARENT membership of the organization to the child; the link is created CONFIRMED (no separate
+        confirmation) and the parent is notified. Requires `GUARDIAN_MANAGE`. Unknown membership -> `422` (`membershipId` `NOT_FOUND`);
+        not PARENT -> `422 NOT_PARENT`; not ACTIVE -> `422 MEMBERSHIP_NOT_ACTIVE`; a non-revoked link of the same membership to the child ->
+        `409 GUARDIAN_ALREADY_LINKED`; a second non-revoked MOTHER or FATHER link on the same child -> `422` (`relationship`
+        `RELATIONSHIP_TAKEN`). Unknown child -> `404`. For parents without an account use `POST /invitations` with role PARENT.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PathOrganizationId"
+        - $ref: "#/components/parameters/PathChildId"
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GuardianLinkRequest"
+      responses:
+        "201":
+          description: Created (status CONFIRMED).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Guardian"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+      x-priority: P0
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -4411,7 +4718,9 @@ paths:
       summary: Confirm a guardian link
       description: >-
         Staff confirmation PENDING → CONFIRMED after identity check; from now on the parent sees the child. The membership must be ACTIVE
-        (`409 MEMBERSHIP_NOT_ACTIVE`).
+        (`409 MEMBERSHIP_NOT_ACTIVE`). Implementation: requires `GUARDIAN_MANAGE`; no re-authentication is checked. Not PENDING -> `409
+        GUARDIAN_NOT_PENDING`; membership not ACTIVE -> `409 MEMBERSHIP_NOT_ACTIVE`; a second non-revoked MOTHER or FATHER on the child ->
+        `409 RELATIONSHIP_TAKEN`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -4441,18 +4750,20 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-      x-requires-reauthentication: true
   /organizations/{organizationId}/guardians/{guardianId}/revoke:
     post:
       operationId: revokeGuardian
       tags:
         - Children
       summary: Revoke a guardian link
-      description: Ends the parent's access to the child immediately (conversations, photos, schedule). Audited with reason.
+      description: >-
+        Ends the parent's access to the child immediately (conversations, photos, schedule). Audited with reason. Implementation: requires
+        `GUARDIAN_MANAGE`; no re-authentication is checked. An empty body is parsed, but `reason` (3..500 characters) is still required
+        (`422`). Already revoked -> `409 GUARDIAN_ALREADY_REVOKED`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -4488,18 +4799,20 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-      x-requires-reauthentication: true
   /organizations/{organizationId}/guardians/{guardianId}:
     patch:
       operationId: updateGuardianFlags
       tags:
         - Children
       summary: Update guardian relationship and rights
-      description: Changes relationship, primary flag and `can*` rights. Parents cannot change their own rights.
+      description: >-
+        Changes relationship, primary flag and `can*` rights. Parents cannot change their own rights. Implementation: requires
+        `GUARDIAN_MANAGE`; also available as `PUT`. Empty body -> `422 EMPTY`; unknown fields -> `422 UNKNOWN_FIELD`; revoked link -> `409
+        GUARDIAN_REVOKED`; changing `relationship` to a MOTHER or FATHER already taken on the child -> `422 RELATIONSHIP_TAKEN`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -4535,17 +4848,156 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
+      x-roles:
+        - OWNER
+        - ADMIN
+    put:
+      operationId: replaceGuardianFlags
+      tags:
+        - Children
+      summary: Update guardian relationship and rights (PUT alias)
+      description: >-
+        Alias of `PATCH /guardians/{guardianId}` for clients that cannot send PATCH: same handler, same partial-update semantics (only the
+        fields present are changed), same errors.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PathOrganizationId"
+        - $ref: "#/components/parameters/PathGuardianId"
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GuardianFlagsUpdate"
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Guardian"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+      x-priority: P1
+      x-status: implemented
+      x-roles:
+        - OWNER
+        - ADMIN
+  /organizations/{organizationId}/parents:
+    get:
+      operationId: listParents
+      tags:
+        - Children
+      summary: Parents overview
+      description: >-
+        Every PARENT membership of the organization (any status) with its guardian links (child name, relationship, link status, primary
+        flag), ordered by family and given name. Requires `GUARDIAN_MANAGE`. Not paginated: returns all rows as `{ items }`.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PathOrganizationId"
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ParentOverview"
+                    description: Parents.
+                required:
+                  - items
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+      x-priority: P0
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
   /organizations/{organizationId}/children/{childId}/pickup-persons:
+    get:
+      operationId: listPickupPersons
+      tags:
+        - Children
+      summary: List pickup persons of a child
+      description: >-
+        Active and revoked pickup persons of the child (ordered by status, then name). Requires `PICKUP_PERSON_READ` and the child in the
+        caller's scope (teacher assignment or CONFIRMED guardian link), otherwise `404`. Not paginated: returns all rows as `{ items }`.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PathOrganizationId"
+        - $ref: "#/components/parameters/PathChildId"
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PickupPerson"
+                    description: Pickup persons.
+                required:
+                  - items
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+      x-priority: P0
+      x-status: implemented
+      x-roles:
+        - OWNER
+        - ADMIN
+        - TEACHER
+        - PARENT
     post:
       operationId: createPickupPerson
       tags:
         - Children
       summary: Add a pickup person
-      description: Confirmed guardians and admins may add entries. Max 10 active per child (`409 PICKUP_LIMIT`).
+      description: >-
+        Confirmed guardians and admins may add entries. Max 10 active per child (`409 PICKUP_LIMIT`). Requires `PICKUP_PERSON_MANAGE` and
+        the child in scope. The child already has 10 ACTIVE entries -> `409 PICKUP_LIMIT`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -4582,7 +5034,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -4593,7 +5045,9 @@ paths:
       tags:
         - Children
       summary: Update a pickup person
-      description: Partial update of an ACTIVE entry.
+      description: >-
+        Partial update of an ACTIVE entry. Also available as `PUT`. Empty body -> `422 EMPTY`; `fullName` 2..200 characters; `validTo`
+        before `validFrom` -> `422 BEFORE_START`; revoked entry -> `409 PICKUP_PERSON_REVOKED`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -4629,7 +5083,55 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
+      x-roles:
+        - OWNER
+        - ADMIN
+        - PARENT
+    put:
+      operationId: replacePickupPerson
+      tags:
+        - Children
+      summary: Update a pickup person (PUT alias)
+      description: >-
+        Alias of `PATCH /pickup-persons/{pickupPersonId}` for clients that cannot send PATCH: same handler, same partial-update semantics,
+        same errors.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PathOrganizationId"
+        - $ref: "#/components/parameters/PathPickupPersonId"
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PickupPersonUpdate"
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PickupPerson"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+      x-priority: P1
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -4640,7 +5142,8 @@ paths:
       tags:
         - Children
       summary: Revoke a pickup person
-      description: Sets status REVOKED (history retained).
+      description: >-
+        Sets status REVOKED (history retained). Body and `reason` are optional. Already revoked -> `409 PICKUP_PERSON_ALREADY_REVOKED`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -4676,7 +5179,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -4794,7 +5297,11 @@ paths:
       tags:
         - Schedules
       summary: Get the week view for a child
-      description: Seven computed days (Mon..Sun) with source, editability and the aggregate `version` returned as `ETag`.
+      description: >-
+        Seven computed days (Mon..Sun) with source, editability and the aggregate `version` returned as `ETag`. Implementation: requires
+        `SCHEDULE_READ` and the child in scope. `weekStart` defaults to the Monday of the current week and must be a Monday (`422`). Each
+        day also carries `overrideVersion` (If-Match for the day override, 0 = none), `overrideReason`, `closureName`, `absenceKind`, the
+        template values (`templateAttends`, `templateArrival`, `templateDeparture`) and `changeDeadline`. Returns `ETag`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -4834,7 +5341,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -4911,7 +5418,8 @@ paths:
       tags:
         - Schedules
       summary: List schedule templates of a child
-      description: Current and historical templates ordered by `effectiveFrom` desc.
+      description: >-
+        Current and historical templates ordered by `effectiveFrom` desc. Requires `SCHEDULE_READ` and the child in scope. Not paginated.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -4948,7 +5456,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -4961,8 +5469,12 @@ paths:
         - Schedules
       summary: Create/replace the recurring weekly template
       description: >-
-        New template effective from `effectiveFrom` (≥ today). The previous template is closed the day before. Future non-frozen daily plans
-        are recomputed; day overrides stay. Logged as `TEMPLATE_REPLACED`.
+        New template effective from `effectiveFrom` (≥ today). The previous template is closed the day before. Future non-frozen daily
+        plans are recomputed; day overrides stay. Logged as `TEMPLATE_REPLACED`. Implementation: requires `SCHEDULE_MANAGE` (OWNER/ADMIN;
+        PARENT only with a CONFIRMED guardian link with `canManageSchedule`, otherwise `403`; TEACHER has no `SCHEDULE_MANAGE`).
+        `effectiveFrom` in the past -> `422 IN_PAST`; `days` must have exactly 7 entries, each weekday once (`422 INVALID_SIZE` /
+        `INVALID_WEEKDAYS`). Answers `201` for a new template and `200` when the template starting on `effectiveFrom` is replaced in
+        place; also available as `PUT`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -4999,11 +5511,64 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-        - TEACHER
+        - PARENT
+    put:
+      operationId: replaceScheduleTemplate
+      tags:
+        - Schedules
+      summary: Create/replace the recurring weekly template (PUT alias)
+      description: >-
+        Alias of `POST .../schedule/templates`: same handler, body and errors. Answers `201` when a new template row starts on
+        `effectiveFrom` and `200` when the template that already starts on `effectiveFrom` is replaced in place (its version is incremented).
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PathOrganizationId"
+        - $ref: "#/components/parameters/PathChildId"
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduleTemplateCreate"
+      responses:
+        "200":
+          description: Existing template replaced.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleTemplate"
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleTemplate"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+      x-priority: P1
+      x-status: implemented
+      x-roles:
+        - OWNER
+        - ADMIN
         - PARENT
   /organizations/{organizationId}/children/{childId}/schedule/overrides/{date}:
     put:
@@ -5012,8 +5577,12 @@ paths:
         - Schedules
       summary: Set a day override
       description: >-
-        Creates or replaces the override for one date. Past/frozen dates → `409 DAY_NOT_EDITABLE`. Late changes are flagged. `If-Match: "0"`
-        when no override exists yet.
+        Creates or replaces the override for one date. Past/frozen dates → `409 DAY_NOT_EDITABLE`. Late changes are flagged. `If-Match:
+        "0"` when no override exists yet. Implementation: requires `SCHEDULE_MANAGE` (PARENT only with `canManageSchedule`). `If-Match` is
+        checked when sent (`"0"` = no override yet, mismatch -> `409 VERSION_MISMATCH` with `currentVersion`) but a missing header is
+        accepted (no `428`). Past dates, closure days and days with recorded attendance -> `409 DAY_NOT_EDITABLE`. Attending on a
+        non-working weekday -> `422 NOT_WORKING_DAY`; times outside opening hours -> `422 OUTSIDE_OPENING_HOURS`; departure before arrival
+        -> `422 BEFORE_ARRIVAL`. Returns `ETag`; logged as `OVERRIDE_SET`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -5056,18 +5625,19 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-        - TEACHER
         - PARENT
     delete:
       operationId: deleteDayOverride
       tags:
         - Schedules
       summary: Remove a day override
-      description: The template applies again for that date. Logged as `OVERRIDE_REMOVED`.
+      description: >-
+        The template applies again for that date. Logged as `OVERRIDE_REMOVED`. Implementation: same rules as PUT; no override on the date
+        -> `404`; `If-Match` optional (checked when sent). Logged as `OVERRIDE_REMOVED`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -5097,11 +5667,10 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-        - TEACHER
         - PARENT
   /organizations/{organizationId}/children/{childId}/schedule/daily-plans:
     get:
@@ -5211,13 +5780,136 @@ paths:
         - ADMIN
         - TEACHER
         - PARENT
+  /organizations/{organizationId}/schedules/expected:
+    get:
+      operationId: listExpectedChildren
+      tags:
+        - Schedules
+      summary: Expected children of a group on a date
+      description: >-
+        Resolved plan (closure > absence > override > template > none) of every child enrolled in the group on the date, for the teacher's
+        day view. Requires `SCHEDULE_READ`; PARENT -> `403`; a group outside the caller's scope (teacher without an assignment valid on
+        the date) or unknown -> `404`. Missing or malformed `groupId` -> `422`.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PathOrganizationId"
+        - name: groupId
+          in: query
+          required: true
+          description: Group.
+          schema:
+            type: string
+            format: uuid
+            description: Group id.
+        - name: date
+          in: query
+          required: false
+          description: "Date (default: today in the organization timezone)."
+          schema:
+            type: string
+            format: date
+            description: Date (calendar date, YYYY-MM-DD).
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpectedChildren"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+      x-priority: P0
+      x-status: implemented
+      x-roles:
+        - OWNER
+        - ADMIN
+        - TEACHER
+  /organizations/{organizationId}/schedules/changes:
+    get:
+      operationId: listScheduleChanges
+      tags:
+        - Schedules
+      summary: Schedule change feed for staff
+      description: >-
+        Template replacements and day override changes that start on `date` (`affected_from = date`), newest first, for the children in the
+        caller's scope (optionally one group). Requires `SCHEDULE_READ`; PARENT -> `403`; a `groupId` outside the scope or unknown ->
+        `404`. Returns up to `limit` items; no cursor. `lateOnly=true` keeps only late changes (any other value means false).
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PathOrganizationId"
+        - name: date
+          in: query
+          required: false
+          description: "Date the changes start on (default: today in the organization timezone)."
+          schema:
+            type: string
+            format: date
+            description: Date (calendar date, YYYY-MM-DD).
+        - name: groupId
+          in: query
+          required: false
+          description: Restrict to one group.
+          schema:
+            type: string
+            format: uuid
+            description: Group id.
+        - name: lateOnly
+          in: query
+          required: false
+          description: Only changes made after the change deadline.
+          schema:
+            type: boolean
+            default: false
+            description: Late changes only.
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduleChangePage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        default:
+          $ref: "#/components/responses/UnexpectedError"
+      x-priority: P1
+      x-status: implemented
+      x-roles:
+        - OWNER
+        - ADMIN
+        - TEACHER
   /organizations/{organizationId}/closure-days:
     get:
       operationId: listClosureDays
       tags:
         - Schedules
       summary: List closure days
-      description: Non-working days for the organization or a location within a range.
+      description: >-
+        Non-working days for the organization or a location within a range. Implementation: requires `SCHEDULE_READ`; ordered by date
+        (organization-wide first).
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -5250,7 +5942,7 @@ paths:
         - name: sort
           in: query
           required: false
-          description: "Sort order (allowlist). Default: `closureDate:asc`."
+          description: "Sort order (allowlist). Default: `closureDate:asc`. Not implemented yet (ignored)."
           schema:
             type: string
             enum:
@@ -5280,7 +5972,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -5294,7 +5986,8 @@ paths:
       summary: Create a closure day
       description: >-
         Duplicate date for the same scope → `409 CLOSURE_EXISTS`. Future daily plans for affected children are recomputed and parents
-        notified.
+        notified. Implementation: requires `SCHEDULE_MANAGE` and an OWNER/ADMIN membership. `closureDate` in the past -> `422 IN_PAST`;
+        unknown location -> `422` (`locationId` `NOT_FOUND`); duplicate -> `409 CLOSURE_EXISTS`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -5330,7 +6023,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -5340,7 +6033,9 @@ paths:
       tags:
         - Schedules
       summary: Delete a closure day
-      description: Only future closure days can be deleted (`409 DAY_FROZEN` otherwise).
+      description: >-
+        Only future closure days can be deleted (`409 DAY_FROZEN` otherwise). Implementation: OWNER/ADMIN; only future closure days can be
+        deleted, today or past -> `409 DAY_FROZEN`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -5366,7 +6061,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -5378,7 +6073,9 @@ paths:
       summary: List absences
       description: >-
         Absences overlapping the range. TEACHER: only groups with an active assignment on the relevant date. PARENT: only children with a
-        CONFIRMED guardian link. Anything outside that scope → `404`.
+        CONFIRMED guardian link. Anything outside that scope → `404`. Implementation: `from` defaults to today and `to` to `from` + 31
+        days; `status` defaults to ACTIVE; `to` before `from` -> `422 BEFORE_START`. Each item carries `childGivenName`, `childFamilyName`
+        and `canCancel`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -5466,7 +6163,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -5481,6 +6178,8 @@ paths:
       description: >-
         Parents need a CONFIRMED guardian link with `canReportAbsence`. Overlap with an ACTIVE absence → `409 ABSENCE_OVERLAP` with
         `conflictingIds`. Daily plans for the period switch to source ABSENCE; teachers are notified. Does not check out a present child.
+        Implementation: requires `ABSENCE_REPORT` (OWNER, ADMIN, PARENT; TEACHER has no `ABSENCE_REPORT`). `dateTo` at most 365 days after
+        `dateFrom` (`422 TOO_LONG`). The `409 ABSENCE_OVERLAP` answer carries no `conflictingIds`. Returns `ETag`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -5519,11 +6218,10 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-        - TEACHER
         - PARENT
   /organizations/{organizationId}/absences/{absenceId}:
     get:
@@ -5531,7 +6229,8 @@ paths:
       tags:
         - Absences
       summary: Get an absence
-      description: Absence details.
+      description: >-
+        Absence details. Returns `ETag`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -5563,7 +6262,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -5578,7 +6277,9 @@ paths:
       summary: Cancel an absence
       description: >-
         Sets status CANCELLED; affected future daily plans fall back to override/template. Days already frozen keep their history. Already
-        cancelled → `409 ABSENCE_ALREADY_CANCELLED`.
+        cancelled → `409 ABSENCE_ALREADY_CANCELLED`. Implementation: OWNER/ADMIN any absence, a PARENT only absences they reported (`403`
+        otherwise). `If-Match` is checked when sent but a missing header is accepted (no `428`). Already cancelled -> `409
+        ABSENCE_ALREADY_CANCELLED`. Returns `ETag`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -5614,11 +6315,10 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-        - TEACHER
         - PARENT
   /organizations/{organizationId}/children/{childId}/attendance/check-in:
     post:
@@ -5629,8 +6329,11 @@ paths:
       description: >-
         Opens a new visit. Unexpected children are recorded as unscheduled present. Already CHECKED_IN → `409 ALREADY_CHECKED_IN`.
         Idempotent by `commandId` (a replay returns `200` with outcome `DUPLICATE`). `expectedVersion` must equal the current
-        `AttendanceDay.version` (`409 VERSION_MISMATCH` with `currentVersion` otherwise). TEACHER: only groups with an active assignment on
-        the relevant date. PARENT: only children with a CONFIRMED guardian link. Anything outside that scope → `404`.
+        `AttendanceDay.version` (`409 VERSION_MISMATCH` with `currentVersion` otherwise). TEACHER: only groups with an active assignment
+        on the relevant date. PARENT: only children with a CONFIRMED guardian link. Anything outside that scope → `404`. Requires
+        `ATTENDANCE_RECORD`. A new command answers `201`, a replayed `commandId` answers `200` with `outcome: DUPLICATE` (a `commandId`
+        reused for another child -> `409 COMMAND_ID_REUSED`). Stale `expectedVersion` -> `409` with `currentVersion`; already checked in
+        -> `409 ALREADY_CHECKED_IN`; a day outside the edit window -> `409 DAY_LOCKED`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -5672,7 +6375,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -5687,7 +6390,8 @@ paths:
         Closes the open visit. No open visit → `409 NO_OPEN_VISIT`. Idempotent by `commandId` (a replay returns `200` with outcome
         `DUPLICATE`). `expectedVersion` must equal the current `AttendanceDay.version` (`409 VERSION_MISMATCH` with `currentVersion`
         otherwise). TEACHER: only groups with an active assignment on the relevant date. PARENT: only children with a CONFIRMED guardian
-        link. Anything outside that scope → `404`.
+        link. Anything outside that scope → `404`. Requires `ATTENDANCE_RECORD`. `201` new, `200` replay. No open visit -> `409
+        NO_OPEN_VISIT`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -5729,7 +6433,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -5744,7 +6448,8 @@ paths:
         Sets `absenceKind` for the day (context only; the status is untouched, a CHECKED_IN child is not checked out). Idempotent by
         `commandId` (a replay returns `200` with outcome `DUPLICATE`). `expectedVersion` must equal the current `AttendanceDay.version`
         (`409 VERSION_MISMATCH` with `currentVersion` otherwise). TEACHER: only groups with an active assignment on the relevant date.
-        PARENT: only children with a CONFIRMED guardian link. Anything outside that scope → `404`.
+        PARENT: only children with a CONFIRMED guardian link. Anything outside that scope → `404`. Requires `ATTENDANCE_RECORD`. `201`
+        new, `200` replay.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -5786,7 +6491,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -5799,9 +6504,9 @@ paths:
       summary: Clear absence context for the day
       description: >-
         Removes the absence context set by mark-absent. Idempotent by `commandId` (a replay returns `200` with outcome `DUPLICATE`).
-        `expectedVersion` must equal the current `AttendanceDay.version` (`409 VERSION_MISMATCH` with `currentVersion` otherwise). TEACHER:
-        only groups with an active assignment on the relevant date. PARENT: only children with a CONFIRMED guardian link. Anything outside
-        that scope → `404`.
+        `expectedVersion` must equal the current `AttendanceDay.version` (`409 VERSION_MISMATCH` with `currentVersion` otherwise).
+        TEACHER: only groups with an active assignment on the relevant date. PARENT: only children with a CONFIRMED guardian link.
+        Anything outside that scope → `404`. Requires `ATTENDANCE_RECORD`. `201` new, `200` replay.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -5843,7 +6548,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -5857,8 +6562,10 @@ paths:
       description: >-
         Appends a CORRECTION event with a mandatory reason (re-time or void an earlier event) and re-projects the day. The original event
         remains. Idempotent by `commandId` (a replay returns `200` with outcome `DUPLICATE`). `expectedVersion` must equal the current
-        `AttendanceDay.version` (`409 VERSION_MISMATCH` with `currentVersion` otherwise). TEACHER: only groups with an active assignment on
-        the relevant date. PARENT: only children with a CONFIRMED guardian link. Anything outside that scope → `404`.
+        `AttendanceDay.version` (`409 VERSION_MISMATCH` with `currentVersion` otherwise). TEACHER: only groups with an active assignment
+        on the relevant date. PARENT: only children with a CONFIRMED guardian link. Anything outside that scope → `404`. Requires
+        `ATTENDANCE_CORRECT`. `reason` 3..500 characters; `correctedOccurredAt` required unless `voidEvent`. Not applicable to the
+        referenced event -> `409 CORRECTION_NOT_APPLICABLE`. `201` new, `200` replay.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -5900,7 +6607,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -5917,7 +6624,8 @@ paths:
         Counters (`expected = present + departed + absent + notArrived`; unscheduled present counted separately; `physicallyPresent =
         present + unscheduledPresent`) and the per-child list with expected times, status, late flag and current version. Same definitions
         as the admin dashboard. Also the offline snapshot for mobile. TEACHER: only groups with an active assignment on the relevant date.
-        PARENT: only children with a CONFIRMED guardian link. Anything outside that scope → `404`.
+        PARENT: only children with a CONFIRMED guardian link. Anything outside that scope → `404`. Implementation: requires
+        `ATTENDANCE_READ`; PARENT -> `403`; missing `groupId` -> `422`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -5961,7 +6669,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -5974,8 +6682,9 @@ paths:
         - Attendance
       summary: Attendance day of a child
       description: >-
-        Projection for one child and date with visits. Returns a synthetic NOT_ARRIVED day (`version: 0`) when no event exists yet. Parents
-        see their own children.
+        Projection for one child and date with visits. Returns a synthetic NOT_ARRIVED day (`version: 0`) when no event exists yet.
+        Parents see their own children. Implementation: requires `ATTENDANCE_READ` and the child in scope. A malformed `date` answers
+        `404` (not `422`). Without recorded attendance a virtual NOT_ARRIVED day without `id` is returned.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -6005,7 +6714,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -6020,8 +6729,9 @@ paths:
       summary: Attendance event history
       description: >-
         Immutable event stream (including corrections) for a group or a single child on a date: who did what, when, from which device.
-        TEACHER: only groups with an active assignment on the relevant date. PARENT: only children with a CONFIRMED guardian link. Anything
-        outside that scope → `404`.
+        TEACHER: only groups with an active assignment on the relevant date. PARENT: only children with a CONFIRMED guardian link.
+        Anything outside that scope → `404`. Implementation: `date` is required and one of `groupId` or `childId` is required (`422`);
+        PARENT -> `403`; `sort` is `recordedAt:desc` (default) or `recordedAt:asc`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -6099,7 +6809,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -6162,7 +6872,8 @@ paths:
       summary: List announcements
       description: >-
         Staff see everything they authored or may manage; recipients (teachers/parents) see PUBLISHED announcements addressed to them that
-        have not expired.
+        have not expired. Implementation: members with `ANNOUNCEMENT_MANAGE` see all statuses; others see only published announcements
+        addressed to them. `sort` is `publishedAt:desc` (default) or `createdAt:desc`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -6229,7 +6940,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -6241,7 +6952,9 @@ paths:
       tags:
         - Announcements
       summary: Create a draft announcement
-      description: Teachers may address only their assigned groups.
+      description: >-
+        Teachers may address only their assigned groups. Implementation: requires `ANNOUNCEMENT_MANAGE` (OWNER/ADMIN). Attachments are not
+        supported yet (files module missing): `attachments` in responses is always an empty array. Returns `ETag`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -6280,18 +6993,19 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-        - TEACHER
   /organizations/{organizationId}/announcements/{announcementId}:
     get:
       operationId: getAnnouncement
       tags:
         - Announcements
       summary: Get an announcement
-      description: Recipients get `404` for drafts, archived items and announcements they are no longer entitled to.
+      description: >-
+        Recipients get `404` for drafts, archived items and announcements they are no longer entitled to. Returns `ETag`. Not addressed to
+        the caller -> `404`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -6323,7 +7037,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -6335,7 +7049,10 @@ paths:
       tags:
         - Announcements
       summary: Update an announcement
-      description: Drafts are fully editable; published ones only `expiresAt` (`409 ANNOUNCEMENT_NOT_EDITABLE`).
+      description: >-
+        Drafts are fully editable; published ones only `expiresAt` (`409 ANNOUNCEMENT_NOT_EDITABLE`). Implementation: requires
+        `ANNOUNCEMENT_MANAGE` and `If-Match` (`428` when missing). Unknown fields -> `422`; ARCHIVED, or PUBLISHED with anything other
+        than `expiresAt` -> `409 ANNOUNCEMENT_NOT_EDITABLE`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -6377,17 +7094,18 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-        - TEACHER
     delete:
       operationId: deleteAnnouncement
       tags:
         - Announcements
       summary: Delete a draft announcement
-      description: Only DRAFT announcements can be deleted; published ones must be archived.
+      description: >-
+        Only DRAFT announcements can be deleted; published ones must be archived. Implementation: requires `ANNOUNCEMENT_MANAGE` and
+        `If-Match`; only DRAFT (`409 ANNOUNCEMENT_NOT_DRAFT`).
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -6416,11 +7134,10 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-        - TEACHER
   /organizations/{organizationId}/announcements/{announcementId}/publish:
     post:
       operationId: publishAnnouncement
@@ -6429,7 +7146,8 @@ paths:
       summary: Publish an announcement
       description: >-
         Evaluates audiences into a recipient snapshot, sets PUBLISHED (or schedules for `publishAt`), enqueues notifications. Requires
-        `ANNOUNCEMENT_PUBLISH` for teachers. Not a draft → `409 ANNOUNCEMENT_NOT_DRAFT`.
+        `ANNOUNCEMENT_PUBLISH` for teachers. Not a draft → `409 ANNOUNCEMENT_NOT_DRAFT`. Implementation: requires `ANNOUNCEMENT_PUBLISH`
+        and `If-Match`; the body is optional (`sendPush` defaults to true). Not DRAFT -> `409 ANNOUNCEMENT_NOT_DRAFT`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -6472,11 +7190,10 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-        - TEACHER
       x-permissions:
         - ANNOUNCEMENT_PUBLISH
   /organizations/{organizationId}/announcements/{announcementId}/archive:
@@ -6485,7 +7202,9 @@ paths:
       tags:
         - Announcements
       summary: Archive an announcement
-      description: PUBLISHED → ARCHIVED; disappears from recipients' lists, read receipts are kept.
+      description: >-
+        PUBLISHED → ARCHIVED; disappears from recipients' lists, read receipts are kept. Implementation: requires `ANNOUNCEMENT_MANAGE`
+        and `If-Match`; not PUBLISHED -> `409 ANNOUNCEMENT_NOT_PUBLISHED`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -6521,18 +7240,19 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-        - TEACHER
   /organizations/{organizationId}/announcements/{announcementId}/recipients:
     get:
       operationId: listAnnouncementRecipients
       tags:
         - Announcements
       summary: Recipients and read receipts
-      description: Snapshot recipients with explicit read time and whether they are still entitled.
+      description: >-
+        Snapshot recipients with explicit read time and whether they are still entitled. Implementation: requires `ANNOUNCEMENT_MANAGE`;
+        `readState` READ or UNREAD; `sort` `familyName:asc` (default) or `readAt:desc`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -6583,19 +7303,19 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-        - TEACHER
-        - SUPPORT
   /organizations/{organizationId}/announcements/{announcementId}/read:
     post:
       operationId: markAnnouncementRead
       tags:
         - Announcements
       summary: Mark an announcement as read
-      description: Explicit read receipt by the recipient (client calls it when the announcement is opened). Idempotent.
+      description: >-
+        Explicit read receipt by the recipient (client calls it when the announcement is opened). Idempotent. Idempotent; an announcement
+        not visible to the caller -> `404`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -6625,7 +7345,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -6637,7 +7357,9 @@ paths:
       tags:
         - Calendar
       summary: List calendar events
-      description: "Events overlapping the range visible to the caller (parents: organization + their children's locations/groups)."
+      description: >-
+        Events overlapping the range visible to the caller (parents: organization + their children's locations/groups). Implementation:
+        `from`/`to` are optional (default: the current month); `sort` `startsOn:asc` (default) or `startsOn:desc`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -6645,16 +7367,16 @@ paths:
         - $ref: "#/components/parameters/PathOrganizationId"
         - name: from
           in: query
-          required: true
-          description: Range start.
+          required: false
+          description: "Range start (default: first day of the current month)."
           schema:
             type: string
             format: date
             description: From (calendar date, YYYY-MM-DD).
         - name: to
           in: query
-          required: true
-          description: Range end (max 366 days).
+          required: false
+          description: "Range end (max 366 days; default: last day of the month of `from`)."
           schema:
             type: string
             format: date
@@ -6724,7 +7446,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -6738,7 +7460,8 @@ paths:
       summary: Create a calendar event
       description: >-
         Timed events need `startsAt`/`endsAt`; all-day events use `startsOn`/`endsOn`. Teachers may create group events for their groups
-        only.
+        only. Implementation: requires `CALENDAR_MANAGE` (OWNER/ADMIN). `startsAt`/`endsAt` required when `allDay` is false; a group of
+        another location -> `422 GROUP_LOCATION_MISMATCH`. Returns `ETag`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -6777,18 +7500,18 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-        - TEACHER
   /organizations/{organizationId}/calendar-events/{eventId}:
     get:
       operationId: getCalendarEvent
       tags:
         - Calendar
       summary: Get a calendar event
-      description: Event details.
+      description: >-
+        Event details. Returns `ETag`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -6820,7 +7543,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -6832,7 +7555,9 @@ paths:
       tags:
         - Calendar
       summary: Update a calendar event
-      description: Partial update with optimistic concurrency; affected recipients are notified of changes.
+      description: >-
+        Partial update with optimistic concurrency; affected recipients are notified of changes. Implementation: requires
+        `CALENDAR_MANAGE` and `If-Match` (`428`). Unknown fields -> `422 UNKNOWN_PROPERTY`; empty body -> `422 EMPTY_PATCH`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -6874,17 +7599,17 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-        - TEACHER
     delete:
       operationId: deleteCalendarEvent
       tags:
         - Calendar
       summary: Delete a calendar event
-      description: Soft delete; recipients are notified of the cancellation.
+      description: >-
+        Soft delete; recipients are notified of the cancellation. Implementation: requires `CALENDAR_MANAGE` and `If-Match` (`428`).
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -6913,18 +7638,19 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
-        - TEACHER
   /organizations/{organizationId}/menu-days:
     get:
       operationId: listMenuDays
       tags:
         - Menus
       summary: List menu days
-      description: Menus in a date range (max 62 days). Parents see published menus only.
+      description: >-
+        Menus in a date range (max 62 days). Parents see published menus only. Implementation: `from` and `to` required, at most 62 days
+        apart (`422`); members without `MENU_MANAGE` always see only published days.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -6996,7 +7722,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -7008,7 +7734,9 @@ paths:
       tags:
         - Menus
       summary: Create a menu day
-      description: Creates an unpublished menu for a date and scope with its items. Duplicate → `409 MENU_DAY_EXISTS`.
+      description: >-
+        Creates an unpublished menu for a date and scope with its items. Duplicate → `409 MENU_DAY_EXISTS`. Requires `MENU_MANAGE`.
+        Duplicate date and location -> `409 MENU_DAY_EXISTS`; at most 40 items and 20 allergen tags per item. Returns `ETag`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -7047,7 +7775,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -7057,7 +7785,8 @@ paths:
       tags:
         - Menus
       summary: Get a menu day
-      description: Menu with items grouped by slot.
+      description: >-
+        Menu with items grouped by slot. Returns `ETag`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -7089,7 +7818,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -7101,7 +7830,8 @@ paths:
       tags:
         - Menus
       summary: Replace items of a menu day
-      description: Full replacement of note and items with optimistic concurrency.
+      description: >-
+        Full replacement of note and items with optimistic concurrency. Requires `MENU_MANAGE` and `If-Match` (`428`).
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -7143,7 +7873,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -7191,7 +7921,9 @@ paths:
       tags:
         - Menus
       summary: Publish a menu day
-      description: Makes the menu visible to parents.
+      description: >-
+        Makes the menu visible to parents. Requires `MENU_MANAGE` and `If-Match` (`428`). Idempotent: publishing a published day returns
+        it unchanged.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -7227,7 +7959,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -8112,7 +8844,10 @@ paths:
       tags:
         - Messaging
       summary: List conversations
-      description: Conversations the caller participates in, newest activity first, with unread counts.
+      description: >-
+        Conversations the caller participates in, newest activity first, with unread counts. Implementation: requires `MESSAGE_SEND`; real
+        cursor pagination (`lastMessageAt` desc). The caller joins conversations they became entitled to and leaves lost ones on each
+        call.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -8185,7 +8920,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -8200,6 +8935,9 @@ paths:
       description: >-
         Creates the conversation with server-derived participants and posts the initial message. If an open conversation of the same kind
         already exists for the child, it is returned with `200` and the message is appended. Requires the `messaging` feature flag.
+        Implementation: an open conversation of the same child and kind is reused (`200`), otherwise created (`201`). TEACHER with
+        PARENT_ADMIN -> `403`; a caller who would not be a participant -> `403`; no confirmed guardian -> `422 NO_GUARDIANS`; no staff
+        recipient -> `422 NO_TEACHERS` / `NO_ADMINS`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -8240,7 +8978,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -8281,7 +9019,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -8296,7 +9034,7 @@ paths:
       summary: List messages
       description: >-
         Messages newest first (cursor pagination). Use `sort=createdAt:asc` together with `after` semantics of the cursor to poll for new
-        messages.
+        messages. Implementation: real cursor pagination; `sort` `createdAt:desc` or `createdAt:asc`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -8337,7 +9075,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -8351,7 +9089,8 @@ paths:
       summary: Send a message
       description: >-
         Idempotent by `clientMessageId` (resend returns the original message with `200`). Closed conversation → `409 CONVERSATION_CLOSED`;
-        participants whose rights ended → `404`.
+        participants whose rights ended → `404`. Implementation: a replayed `clientMessageId` of the same sender answers `200` with the
+        original; used by another sender -> `409 CLIENT_MESSAGE_ID_TAKEN`; closed conversation -> `409 CONVERSATION_CLOSED`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -8393,7 +9132,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -8441,7 +9180,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -8453,7 +9192,10 @@ paths:
       tags:
         - Compliance
       summary: List audit log entries
-      description: Append-only audit entries of the tenant. Filters are allowlisted; metadata never contains payloads or health data.
+      description: >-
+        Append-only audit entries of the tenant. Filters are allowlisted; metadata never contains payloads or health data. Implementation:
+        requires `AUDIT_READ` (OWNER/ADMIN); real cursor pagination; `from`/`to` accept an RFC 3339 instant or a date (organization
+        timezone, `to` inclusive); only `sort=occurredAt:desc`. Entries carry `actorName`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -8551,7 +9293,7 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P0
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
@@ -8564,7 +9306,13 @@ paths:
       summary: Attendance summary report
       description: >-
         Aggregated attendance for a date range by group/location using the daily-overview definitions. Max 366 days; per-date breakdown only
-        for ranges ≤ 62 days. Export to file requires `REPORT_EXPORT` (future).
+        for ranges ≤ 62 days. Requires `REPORT_VIEW`. Days after today are not counted (`countedTo`). Range errors: `to` before `from` ->
+        `422 BEFORE_FROM`, longer than 366 days -> `422 RANGE_TOO_LONG`. CSV export: `format=csv` (or `Accept: text/csv` without
+        `application/json`) additionally requires `REPORT_EXPORT` (OWNER, or ADMIN with the granted extra permission), answers `text/csv;
+        charset=UTF-8` as an attachment (`Content-Disposition: attachment; filename=attendance-summary-<from>-<to>.csv`, `Cache-Control:
+        no-store`) and is audited as `REPORT_EXPORTED`. The CSV is UTF-8 with BOM, `;` separator, CRLF line ends, decimal comma except for
+        English; header language follows `Accept-Language` (sr-Latn default, sr-Cyrl, en); one row per child plus a total row per group,
+        cells starting with `=`, `+`, `-` or `@` are prefixed with `'`.
       security:
         - cookieAuth: []
         - bearerAuth: []
@@ -8602,6 +9350,16 @@ paths:
             type: string
             format: uuid
             description: Location.
+        - name: format
+          in: query
+          required: false
+          description: "Response format: `json` (default) or `csv` (requires `REPORT_EXPORT`). Other values -> `422`."
+          schema:
+            type: string
+            enum:
+              - json
+              - csv
+            description: Format.
       responses:
         "200":
           description: OK.
@@ -8609,6 +9367,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AttendanceSummaryReport"
+            text/csv:
+              schema:
+                type: string
+                description: UTF-8 CSV with BOM, `;` separated (see the operation description).
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -8624,11 +9386,13 @@ paths:
         default:
           $ref: "#/components/responses/UnexpectedError"
       x-priority: P1
-      x-status: designed
+      x-status: implemented
       x-roles:
         - OWNER
         - ADMIN
         - SUPPORT
+      x-permissions:
+        - REPORT_EXPORT
   /organizations/{organizationId}/privacy-requests:
     get:
       operationId: listPrivacyRequests
@@ -9135,6 +9899,10 @@ components:
       description: >-
         Authenticated, but the operation is not allowed for the caller's role/permissions on a resource the caller can see (e.g. TEACHER
         trying to publish an announcement). Never used to hide existence — see `404`.
+        Implemented `detail` codes: none (plain `403` without detail when a role permission is missing), `CSRF_INVALID`,
+        `REAUTHENTICATION_REQUIRED`, `MFA_REQUIRED` (session must pass `POST /auth/mfa/totp/verify` first; also platform admin without an
+        MFA-verified session), `MFA_ENROLLMENT_REQUIRED` (OWNER without an enrolled method, on tenant and platform routes) and
+        `ORGANIZATION_SUSPENDED` (member of a SUSPENDED or ARCHIVED organization, on every tenant route).
       content:
         application/problem+json:
           schema:
@@ -9521,11 +10289,14 @@ components:
           maxLength: 256
         device:
           $ref: "#/components/schemas/DeviceInfo"
+        clientKind:
+          $ref: "#/components/schemas/ClientKind"
+      description: >-
+        Either `device` (with `device.clientKind`) or a top-level `clientKind` must be present; `device.clientKind` wins when both are
+        sent. Without a valid client kind the login answers `401 INVALID_CREDENTIALS`. Unknown fields are ignored.
       required:
         - email
         - password
-        - device
-      additionalProperties: false
     TokenPair:
       type: object
       description: Issued only in `bearerAuth` mode. In `cookieAuth` mode tokens are delivered as HttpOnly cookies and this object is absent.
@@ -9579,11 +10350,20 @@ components:
           type:
             - string
             - "null"
-          description: Short-lived (5 min) opaque challenge token to pass to `POST /auth/mfa/totp/verify` when `MFA_REQUIRED`.
+          description: >-
+            Short-lived (5 min) opaque challenge token to pass to `POST /auth/mfa/totp/verify` when `MFA_REQUIRED`. Not returned by the
+            current implementation (the limited session itself is verified).
+        mfaEnrollmentRequired:
+          type: boolean
+          description: >-
+            Login and register only (always present there): true when MFA is mandatory for the account (OWNER membership) but no method is
+            enrolled yet; tenant and platform routes answer `403 MFA_ENROLLMENT_REQUIRED` until enrollment is confirmed. Not sent by refresh
+            or MFA verification.
         user:
           oneOf:
             - $ref: "#/components/schemas/User"
             - type: "null"
+          description: Not returned by the current implementation (use `GET /me`).
       required:
         - status
     RefreshRequest:
@@ -9671,12 +10451,21 @@ components:
         mfaVerified:
           type: boolean
           description: True when MFA has passed for this session.
+        mfaEnabled:
+          type: boolean
+          description: True when the user has a confirmed TOTP method.
+        mfaRequired:
+          type: boolean
+          description: True when this session still has to pass `POST /auth/mfa/totp/verify` (everything else answers `403 MFA_REQUIRED`).
+        mfaEnrollmentRequired:
+          type: boolean
+          description: True when MFA is mandatory (OWNER membership) but not enrolled; tenant and platform routes answer `403 MFA_ENROLLMENT_REQUIRED`.
         reauthenticatedAt:
           type:
             - string
             - "null"
           format: date-time
-          description: Last password/MFA re-entry (RFC 3339 instant, UTC).
+          description: Last password/MFA re-entry (RFC 3339 instant, UTC); omitted when null.
         absoluteExpiresAt:
           type: string
           format: date-time
@@ -9685,21 +10474,78 @@ components:
           type:
             - string
             - "null"
-          description: Double-submit CSRF token (cookie mode only); send as `X-CSRF-Token` on mutating requests.
+          description: >-
+            Double-submit CSRF token (cookie mode only). Not returned by the current implementation: read it from the `vc_csrf` cookie and
+            send it as `X-CSRF-Token` on mutating requests.
         user:
-          $ref: "#/components/schemas/User"
+          $ref: "#/components/schemas/SessionUser"
         memberships:
           type: array
           items:
             $ref: "#/components/schemas/MyMembership"
-          description: Membership summary (tenant switcher) so the web app can bootstrap without a second round-trip.
+          description: >-
+            Membership summary (tenant switcher). Not returned by the current implementation: the summary is `user.memberships`; use `GET
+            /me/memberships` for the full list.
       required:
         - userId
         - sessionId
         - clientKind
         - mfaVerified
+        - mfaEnabled
+        - mfaRequired
+        - mfaEnrollmentRequired
         - absoluteExpiresAt
         - user
+    SessionUser:
+      type: object
+      description: Minimal user profile of the session bootstrap.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: User id.
+        email:
+          type: string
+          format: email
+          description: Login e-mail.
+        displayName:
+          type: string
+          description: Given and family name.
+        isPlatformAdmin:
+          type: boolean
+          description: True for platform operators.
+        memberships:
+          type: array
+          description: ACTIVE memberships, ordered by organization name.
+          items:
+            type: object
+            properties:
+              organizationId:
+                type: string
+                format: uuid
+                description: Organization id.
+              organizationName:
+                type: string
+                description: Organization name.
+              role:
+                type: string
+                enum:
+                  - KINDERGARTEN_OWNER
+                  - ADMIN
+                  - TEACHER
+                  - PARENT
+                description: >-
+                  Membership role. The OWNER role is reported as `KINDERGARTEN_OWNER` here (web client label), unlike every other endpoint
+                  which uses `OWNER`.
+            required:
+              - organizationId
+              - organizationName
+              - role
+      required:
+        - id
+        - email
+        - displayName
+        - isPlatformAdmin
         - memberships
     VerifyEmailRequest:
       type: object
@@ -9804,16 +10650,14 @@ components:
       properties:
         mfaChallengeToken:
           type: string
-          description: Challenge token returned by login with `MFA_REQUIRED`.
+          description: Challenge token returned by login with `MFA_REQUIRED`. Accepted and ignored by the current implementation.
         code:
           type: string
           description: 6-digit TOTP code or a recovery code.
           minLength: 6
           maxLength: 24
       required:
-        - mfaChallengeToken
         - code
-      additionalProperties: false
     RecoveryCodes:
       type: object
       properties:
@@ -10066,6 +10910,11 @@ components:
             - "null"
           format: uuid
           description: Tenant (null for global/security notifications).
+        organizationName:
+          type:
+            - string
+            - "null"
+          description: Name of the tenant (omitted for global/security notifications), so the inbox can label items without a lookup.
         membershipId:
           type:
             - string
@@ -10127,7 +10976,6 @@ components:
         - titleKey
         - titleArgs
         - createdAt
-        - readAt
     NotificationMarkReadRequest:
       type: object
       properties:
@@ -10162,12 +11010,15 @@ components:
           $ref: "#/components/schemas/MembershipRole"
         email:
           type: string
-          description: Invited e-mail (masked, e.g. `m***@example.test`).
+          description: >-
+            Invited e-mail (designed as masked, e.g. `m***@example.test`). The current implementation returns the full, unmasked address.
         childGivenName:
           type:
             - string
             - "null"
-          description: "For PARENT invitations: given name of the child the guardian link is for."
+          description: >-
+            For PARENT invitations: given name of the child the guardian link is for. Not returned by the current implementation (always
+            null, so omitted).
         expiresAt:
           type: string
           format: date-time
@@ -11156,6 +12007,10 @@ components:
             - ACTIVE
             - INACTIVE
           description: Status.
+        activeGroupsCount:
+          type: integer
+          minimum: 0
+          description: Number of ACTIVE groups at this location.
         createdAt:
           type: string
           format: date-time
@@ -11170,6 +12025,7 @@ components:
         - name
         - countryCode
         - status
+        - activeGroupsCount
         - createdAt
         - updatedAt
     LocationCreate:
@@ -11273,6 +12129,9 @@ components:
           type: string
           format: uuid
           description: Location.
+        locationName:
+          type: string
+          description: Name of the location.
         name:
           type: string
           description: Name (unique per location).
@@ -11301,6 +12160,11 @@ components:
           type: integer
           description: Children enrolled today.
           minimum: 0
+        teachers:
+          type: array
+          items:
+            $ref: "#/components/schemas/GroupTeacher"
+          description: Teacher assignments of the group that are not revoked and valid today.
         createdAt:
           type: string
           format: date-time
@@ -11313,11 +12177,51 @@ components:
         - id
         - organizationId
         - locationId
+        - locationName
         - name
         - status
         - activeChildrenCount
+        - teachers
         - createdAt
         - updatedAt
+    GroupTeacher:
+      type: object
+      description: Teacher assigned to a group (embedded in `Group`).
+      properties:
+        assignmentId:
+          type: string
+          format: uuid
+          description: Group-teacher assignment id.
+        employeeId:
+          type: string
+          format: uuid
+          description: Employee.
+        displayName:
+          type: string
+          description: Employee display name.
+        assignmentRole:
+          type: string
+          enum:
+            - LEAD
+            - ASSISTANT
+            - SUBSTITUTE
+          description: Role in the group.
+        validFrom:
+          type: string
+          format: date
+          description: First valid day (calendar date, YYYY-MM-DD).
+        validTo:
+          type:
+            - string
+            - "null"
+          format: date
+          description: Last valid day (calendar date, YYYY-MM-DD); omitted when open-ended.
+      required:
+        - assignmentId
+        - employeeId
+        - displayName
+        - assignmentRole
+        - validFrom
     GroupCreate:
       type: object
       properties:
@@ -11438,6 +12342,11 @@ components:
             - "null"
           format: uuid
           description: Primary location.
+        primaryLocationName:
+          type:
+            - string
+            - "null"
+          description: Name of the primary location; omitted when there is none.
         startedAt:
           type:
             - string
@@ -11455,6 +12364,11 @@ components:
           items:
             $ref: "#/components/schemas/Permission"
           description: Active extra permissions.
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmployeeGroup"
+          description: Groups the employee is currently assigned to.
         createdAt:
           type: string
           format: date-time
@@ -11471,9 +12385,65 @@ components:
         - role
         - membershipStatus
         - displayName
+        - email
         - permissions
+        - groups
         - createdAt
         - updatedAt
+    EmployeeGroup:
+      type: object
+      description: Current group assignment of an employee (embedded in `Employee`).
+      properties:
+        groupId:
+          type: string
+          format: uuid
+          description: Group.
+        groupName:
+          type: string
+          description: Group name.
+        assignmentRole:
+          type: string
+          enum:
+            - LEAD
+            - ASSISTANT
+            - SUBSTITUTE
+          description: Role in the group.
+      required:
+        - groupId
+        - groupName
+        - assignmentRole
+    EmployeeCreate:
+      type: object
+      description: >-
+        Creates the staff profile for an existing ACTIVE OWNER/ADMIN/TEACHER membership that has none yet (e.g. an OWNER created through
+        the platform). Unknown fields are ignored.
+      properties:
+        membershipId:
+          type: string
+          format: uuid
+          description: ACTIVE staff membership of this organization.
+        displayName:
+          type: string
+          description: Display name (defaults to the user's name when omitted).
+          maxLength: 200
+        jobTitle:
+          type: string
+          description: Job title.
+          maxLength: 100
+        phone:
+          type: string
+          description: Phone.
+          maxLength: 32
+        primaryLocationId:
+          type: string
+          format: uuid
+          description: Primary location (must exist in the organization).
+        startedAt:
+          type: string
+          format: date
+          description: Employment start (calendar date, YYYY-MM-DD).
+      required:
+        - membershipId
     EmployeeUpdate:
       type: object
       properties:
@@ -11538,6 +12508,11 @@ components:
             - "null"
           format: uuid
           description: Child (PARENT invitations only).
+        childName:
+          type:
+            - string
+            - "null"
+          description: Given and family name of the child (PARENT invitations only).
         invitedBy:
           type: string
           format: uuid
@@ -11593,31 +12568,37 @@ components:
             - OWNER
             - ADMIN
             - TEACHER
-          description: Staff role. ADMIN may invite TEACHER/ADMIN; only OWNER may invite OWNER.
+            - PARENT
+          description: >-
+            Role to invite. OWNER may invite ADMIN, TEACHER and PARENT; ADMIN may invite TEACHER and PARENT; OWNER is never invitable
+            through this API (`403 ROLE_ESCALATION`).
+        childId:
+          type: string
+          format: uuid
+          description: >-
+            Child the guardian link is for: required for PARENT, not allowed for other roles (`422 NOT_ALLOWED`). Unknown child -> `404`.
         displayName:
           type: string
-          description: Initial employee display name.
+          description: Initial employee display name. Accepted but not stored by the current implementation.
           minLength: 1
           maxLength: 200
         jobTitle:
           type: string
-          description: Job title.
+          description: Job title. Accepted but not stored by the current implementation.
           maxLength: 100
         primaryLocationId:
           type: string
           format: uuid
-          description: Primary location.
+          description: Primary location. Ignored by the current implementation.
         permissions:
           type: array
           items:
             $ref: "#/components/schemas/Permission"
-          description: Extra permissions granted on acceptance.
+          description: Extra permissions granted on acceptance. Ignored by the current implementation.
           uniqueItems: true
       required:
         - email
         - role
-        - displayName
-      additionalProperties: false
     Membership:
       type: object
       properties:
@@ -11678,8 +12659,14 @@ components:
           description: Revoked (RFC 3339 instant, UTC).
         childrenCount:
           type: integer
-          description: "For PARENT: number of confirmed guardian links."
+          description: "Number of guardian links of the membership that are not revoked (PENDING and CONFIRMED); 0 for staff."
           minimum: 0
+        employeeId:
+          type:
+            - string
+            - "null"
+          format: uuid
+          description: Staff profile of the membership; omitted when there is none (PARENT, or staff without a profile yet).
         createdAt:
           type: string
           format: date-time
@@ -11694,9 +12681,11 @@ components:
         - userId
         - givenName
         - familyName
+        - email
         - role
         - status
         - permissions
+        - childrenCount
         - createdAt
         - updatedAt
     MembershipPermissionsUpdate:
@@ -11733,10 +12722,16 @@ components:
           type: string
           format: uuid
           description: Group.
+        groupName:
+          type: string
+          description: Group name.
         employeeId:
           type: string
           format: uuid
           description: Employee.
+        employeeDisplayName:
+          type: string
+          description: Employee display name.
         assignmentRole:
           type: string
           enum:
@@ -11768,7 +12763,9 @@ components:
         - id
         - organizationId
         - groupId
+        - groupName
         - employeeId
+        - employeeDisplayName
         - assignmentRole
         - validFrom
         - createdAt
@@ -11892,7 +12889,7 @@ components:
             - "null"
           description: >-
             Boolean indicator only ("open the health profile before acting"); carries no medical content. `null` for callers without staff
-            role.
+            role. Not returned by the current implementation (health profiles are not implemented; always null, so omitted).
         version:
           type: integer
           description: Optimistic-concurrency version.
@@ -11904,7 +12901,6 @@ components:
         - familyName
         - dateOfBirth
         - status
-        - currentEnrollment
         - version
     Child:
       allOf:
@@ -11940,7 +12936,6 @@ components:
               format: date-time
               description: Updated (RFC 3339 instant, UTC).
           required:
-            - generalNotes
             - enrollments
             - guardians
             - pickupPersons
@@ -12022,13 +13017,20 @@ components:
             - string
             - "null"
           format: uuid
-          description: READY file with purpose `CHILD_PROFILE_PHOTO`; null removes the profile photo.
+          description: >-
+            READY file with purpose `CHILD_PROFILE_PHOTO`; null removes the profile photo. The files module is not implemented yet: a
+            non-null value answers `422 NOT_SUPPORTED`; only `null` is accepted.
         status:
           type: string
           enum:
             - ACTIVE
             - INACTIVE
           description: Status.
+        version:
+          type: integer
+          minimum: 1
+          description: Expected version; alternative to the `If-Match` header (one of the two is required, `428` otherwise).
+      description: Unknown fields -> `422 UNKNOWN_FIELD`; a body with only `version` -> `422 EMPTY`.
       additionalProperties: false
       minProperties: 1
     Enrollment:
@@ -12050,6 +13052,13 @@ components:
           type: string
           format: uuid
           description: Group.
+        groupName:
+          type: string
+          description: Group name.
+        locationId:
+          type: string
+          format: uuid
+          description: Location of the group.
         validFrom:
           type: string
           format: date
@@ -12086,6 +13095,8 @@ components:
         - organizationId
         - childId
         - groupId
+        - groupName
+        - locationId
         - validFrom
         - status
         - createdAt
@@ -12094,7 +13105,7 @@ components:
       type: object
       description: >-
         Overlapping PLANNED/ACTIVE enrollment → `409 ENROLLMENT_OVERLAP`. Moving a child between groups = end the current enrollment and
-        create a new one.
+        create a new one, or send `endCurrentEnrollment: true` to do both in one request.
       properties:
         groupId:
           type: string
@@ -12108,10 +13119,15 @@ components:
           type: string
           format: date
           description: To (optional) (calendar date, YYYY-MM-DD).
+        endCurrentEnrollment:
+          type: boolean
+          default: false
+          description: >-
+            When true, the enrollment covering the day before `validFrom` is ended (end reason MOVED) in the same transaction, so a group
+            change needs one request.
       required:
         - groupId
         - validFrom
-      additionalProperties: false
     EnrollmentEnd:
       type: object
       properties:
@@ -12299,6 +13315,127 @@ components:
           description: May read health profile.
       additionalProperties: false
       minProperties: 1
+    GuardianLinkRequest:
+      type: object
+      description: Body of `POST /children/{childId}/guardians`. Unknown fields are ignored.
+      properties:
+        membershipId:
+          type: string
+          format: uuid
+          description: ACTIVE PARENT membership of this organization.
+        relationship:
+          type: string
+          enum:
+            - MOTHER
+            - FATHER
+            - LEGAL_GUARDIAN
+            - GRANDPARENT
+            - OTHER
+          description: Relationship to the child. At most one non-revoked MOTHER and one FATHER per child.
+        isPrimary:
+          type: boolean
+          default: false
+          description: Primary guardian.
+        canManageSchedule:
+          type: boolean
+          default: true
+          description: May change the schedule.
+        canReportAbsence:
+          type: boolean
+          default: true
+          description: May report absences.
+        canGiveConsent:
+          type: boolean
+          default: true
+          description: May give consents.
+        canViewHealth:
+          type: boolean
+          default: true
+          description: May view the health profile.
+      required:
+        - membershipId
+        - relationship
+    ParentOverview:
+      type: object
+      description: A PARENT membership with its guardian links (`GET /parents`).
+      properties:
+        membershipId:
+          type: string
+          format: uuid
+          description: Membership.
+        userId:
+          type: string
+          format: uuid
+          description: User.
+        displayName:
+          type: string
+          description: Given and family name.
+        email:
+          type: string
+          format: email
+          description: E-mail.
+        status:
+          type: string
+          enum:
+            - INVITED
+            - ACTIVE
+            - SUSPENDED
+            - REVOKED
+          description: Membership status.
+        links:
+          type: array
+          description: Guardian links of this membership (CONFIRMED first, then PENDING, then REVOKED).
+          items:
+            type: object
+            properties:
+              guardianId:
+                type: string
+                format: uuid
+                description: Guardian link id.
+              childId:
+                type: string
+                format: uuid
+                description: Child.
+              childGivenName:
+                type: string
+                description: Child given name.
+              childFamilyName:
+                type: string
+                description: Child family name.
+              relationship:
+                type: string
+                enum:
+                  - MOTHER
+                  - FATHER
+                  - LEGAL_GUARDIAN
+                  - GRANDPARENT
+                  - OTHER
+                description: Relationship.
+              status:
+                type: string
+                enum:
+                  - PENDING
+                  - CONFIRMED
+                  - REVOKED
+                description: Link status.
+              isPrimary:
+                type: boolean
+                description: Primary guardian.
+            required:
+              - guardianId
+              - childId
+              - childGivenName
+              - childFamilyName
+              - relationship
+              - status
+              - isPrimary
+      required:
+        - membershipId
+        - userId
+        - displayName
+        - email
+        - status
+        - links
     PickupPerson:
       type: object
       description: Authorised pickup list (P0). Digital pickup verification is future scope.
@@ -12657,7 +13794,6 @@ components:
         - id
         - childId
         - effectiveFrom
-        - effectiveTo
         - days
         - version
         - createdByMembershipId
@@ -12834,6 +13970,51 @@ components:
         isEditable:
           type: boolean
           description: Whether the caller may still change this day (deadline, frozen, closure).
+        overrideVersion:
+          type: integer
+          minimum: 0
+          description: Version of the day override, to send as `If-Match` on `PUT/DELETE .../overrides/{date}`; `0` when there is none.
+        overrideReason:
+          type:
+            - string
+            - "null"
+          description: Reason of the day override, when there is one.
+        closureName:
+          type:
+            - string
+            - "null"
+          description: Name of the closure day, when `source` is CLOSURE.
+        absenceKind:
+          type:
+            - string
+            - "null"
+          enum:
+            - SICK
+            - VACATION
+            - OTHER
+            - null
+          description: Kind of the active absence, when there is one.
+        templateAttends:
+          type:
+            - boolean
+            - "null"
+          description: What the recurring template says for this day (so a client can offer "reset to template"); omitted without a template.
+        templateArrival:
+          type:
+            - string
+            - "null"
+          description: Template arrival time (HH:MM, organization timezone).
+        templateDeparture:
+          type:
+            - string
+            - "null"
+          description: Template departure time (HH:MM, organization timezone).
+        changeDeadline:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: Instant after which a change of this day is flagged as a late change (RFC 3339, UTC).
       required:
         - date
         - weekday
@@ -12842,6 +14023,7 @@ components:
         - isLateChange
         - isFrozen
         - isEditable
+        - overrideVersion
     WeekSchedule:
       type: object
       properties:
@@ -13127,7 +14309,12 @@ components:
             - string
             - "null"
           format: uuid
-          description: Location (null = whole organization).
+          description: Location (null, so omitted, = whole organization).
+        locationName:
+          type:
+            - string
+            - "null"
+          description: Name of the location; omitted for organization-wide closures.
         closureDate:
           type: string
           format: date
@@ -13142,7 +14329,6 @@ components:
       required:
         - id
         - organizationId
-        - locationId
         - closureDate
         - name
         - createdAt
@@ -13166,6 +14352,223 @@ components:
         - closureDate
         - name
       additionalProperties: false
+    ExpectedChild:
+      type: object
+      description: One child of the group and its resolved plan for the date (`GET /schedules/expected`).
+      properties:
+        childId:
+          type: string
+          format: uuid
+          description: Child.
+        givenName:
+          type: string
+          description: Given name.
+        familyName:
+          type: string
+          description: Family name.
+        isExpected:
+          type: boolean
+          description: Whether the child is expected on the date.
+        expectedArrival:
+          type:
+            - string
+            - "null"
+          description: Expected arrival (HH:MM, organization timezone).
+        expectedDeparture:
+          type:
+            - string
+            - "null"
+          description: Expected departure (HH:MM, organization timezone).
+        source:
+          $ref: "#/components/schemas/ScheduleSource"
+        absenceId:
+          type:
+            - string
+            - "null"
+          format: uuid
+          description: Active absence covering the date.
+        absenceKind:
+          type:
+            - string
+            - "null"
+          enum:
+            - SICK
+            - VACATION
+            - OTHER
+            - null
+          description: Kind of that absence.
+        overrideId:
+          type:
+            - string
+            - "null"
+          format: uuid
+          description: Day override of the date.
+        overrideReason:
+          type:
+            - string
+            - "null"
+          description: Reason of the day override.
+        isLateChange:
+          type: boolean
+          description: The plan of the date was changed after the change deadline.
+        closureDayId:
+          type:
+            - string
+            - "null"
+          format: uuid
+          description: Closure day producing the plan.
+      required:
+        - childId
+        - givenName
+        - familyName
+        - isExpected
+        - source
+        - isLateChange
+    ExpectedChildren:
+      type: object
+      description: Resolved plans of every child enrolled in a group on a date.
+      properties:
+        groupId:
+          type: string
+          format: uuid
+          description: Group.
+        date:
+          type: string
+          format: date
+          description: Date (calendar date, YYYY-MM-DD).
+        weekday:
+          type: integer
+          minimum: 1
+          maximum: 7
+          description: ISO weekday (1 = Monday).
+        isWorkingDay:
+          type: boolean
+          description: Whether the weekday is a working day of the organization.
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExpectedChild"
+          description: Children.
+        closureDayId:
+          type:
+            - string
+            - "null"
+          format: uuid
+          description: Closure day of the group's location (or the whole organization) on the date.
+        closureName:
+          type:
+            - string
+            - "null"
+          description: Name of that closure day.
+      required:
+        - groupId
+        - date
+        - weekday
+        - isWorkingDay
+        - items
+    ScheduleChange:
+      type: object
+      description: One `schedule_change_log` entry. `before`/`after` hold only times and flags (no names, reasons or health data).
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Log entry id.
+        childId:
+          type: string
+          format: uuid
+          description: Child.
+        givenName:
+          type: string
+          description: Child given name.
+        familyName:
+          type: string
+          description: Child family name.
+        groupId:
+          type:
+            - string
+            - "null"
+          format: uuid
+          description: Group the child is enrolled in on the date.
+        groupName:
+          type:
+            - string
+            - "null"
+          description: Name of that group.
+        changeKind:
+          type: string
+          enum:
+            - TEMPLATE_REPLACED
+            - OVERRIDE_SET
+            - OVERRIDE_REMOVED
+          description: What changed.
+        affectedFrom:
+          type: string
+          format: date
+          description: First affected day (calendar date, YYYY-MM-DD).
+        affectedTo:
+          type:
+            - string
+            - "null"
+          format: date
+          description: Last affected day (omitted when open-ended).
+        isLateChange:
+          type: boolean
+          description: Made after the change deadline.
+        actorMembershipId:
+          type:
+            - string
+            - "null"
+          format: uuid
+          description: Membership that made the change.
+        actorName:
+          type:
+            - string
+            - "null"
+          description: Name of that member.
+        actorRole:
+          type:
+            - string
+            - "null"
+          description: Role of that member.
+        before:
+          description: Previous state (times and flags only); omitted when none.
+        after:
+          description: New state (times and flags only); omitted when none.
+        occurredAt:
+          type: string
+          format: date-time
+          description: When the change was made (RFC 3339 instant, UTC).
+      required:
+        - id
+        - childId
+        - givenName
+        - familyName
+        - changeKind
+        - affectedFrom
+        - isLateChange
+        - occurredAt
+    ScheduleChangePage:
+      type: object
+      description: Schedule changes starting on `date`; up to `limit` items, newest first, no cursor.
+      properties:
+        date:
+          type: string
+          format: date
+          description: Date the changes start on (calendar date, YYYY-MM-DD).
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduleChange"
+          description: Changes.
+        nextCursor:
+          type:
+            - string
+            - "null"
+          description: Always null (omitted); no cursor is implemented.
+      required:
+        - date
+        - items
     Absence:
       type: object
       properties:
@@ -13181,6 +14584,12 @@ components:
           type: string
           format: uuid
           description: Child.
+        childGivenName:
+          type: string
+          description: Child given name (for lists without a second lookup).
+        childFamilyName:
+          type: string
+          description: Child family name.
         kind:
           $ref: "#/components/schemas/AbsenceKind"
         dateFrom:
@@ -13230,10 +14639,17 @@ components:
           type: string
           format: date-time
           description: Updated (RFC 3339 instant, UTC).
+        canCancel:
+          type: boolean
+          description: >-
+            True when the caller may cancel this absence now (status ACTIVE, `ABSENCE_REPORT`, and the caller is OWNER/ADMIN or the
+            reporter).
       required:
         - id
         - organizationId
         - childId
+        - childGivenName
+        - childFamilyName
         - kind
         - dateFrom
         - dateTo
@@ -13242,6 +14658,7 @@ components:
         - version
         - createdAt
         - updatedAt
+        - canCancel
     AbsenceCreate:
       type: object
       description: >-
@@ -13409,9 +14826,7 @@ components:
         - id
         - sequenceNo
         - checkInAt
-        - checkOutAt
         - checkInEventId
-        - checkOutEventId
     AttendanceDay:
       type: object
       properties:
@@ -13506,12 +14921,9 @@ components:
           format: date-time
           description: Updated (RFC 3339 instant, UTC).
       required:
-        - id
         - childId
-        - groupId
         - attendanceDate
         - status
-        - absenceKind
         - isExpected
         - isUnscheduled
         - isLate
@@ -13760,7 +15172,6 @@ components:
         - familyName
         - isExpected
         - status
-        - absenceKind
         - overviewState
         - isLate
         - isUnscheduled
@@ -14255,7 +15666,6 @@ components:
         - familyName
         - role
         - snapshotAt
-        - readAt
         - stillEntitled
     CalendarEvent:
       type: object
@@ -14355,8 +15765,6 @@ components:
         - organizationId
         - kind
         - title
-        - locationId
-        - groupId
         - allDay
         - startsOn
         - endsOn
@@ -14609,7 +16017,6 @@ components:
       required:
         - id
         - organizationId
-        - locationId
         - menuDate
         - isPublished
         - items
@@ -15340,7 +16747,6 @@ components:
         - familyName
         - participantRole
         - joinedAt
-        - leftAt
     Conversation:
       type: object
       properties:
@@ -15365,6 +16771,9 @@ components:
         childGivenName:
           type: string
           description: Child given name.
+        childFamilyName:
+          type: string
+          description: Child family name.
         groupId:
           type:
             - string
@@ -15418,10 +16827,9 @@ components:
         - kind
         - childId
         - childGivenName
+        - childFamilyName
         - participants
-        - lastMessageAt
         - unreadCount
-        - closedAt
         - createdAt
     ConversationCreate:
       type: object
@@ -15498,8 +16906,6 @@ components:
         - clientMessageId
         - body
         - createdAt
-        - editedAt
-        - deletedAt
         - isOwn
     MessageCreate:
       type: object
@@ -15552,8 +16958,6 @@ components:
           minimum: 0
       required:
         - conversationId
-        - lastReadMessageId
-        - lastReadAt
         - unreadCount
     AuditLogEntry:
       type: object
@@ -15578,6 +16982,11 @@ components:
             - "null"
           format: uuid
           description: Actor membership.
+        actorName:
+          type:
+            - string
+            - "null"
+          description: Given and family name of the actor user; omitted for system entries.
         action:
           type: string
           description: Action code, e.g. `CHILD_UPDATED`, `HEALTH_READ`, `GUARDIAN_REVOKED`.
@@ -15634,6 +17043,14 @@ components:
           type: string
           format: date
           description: To (calendar date, YYYY-MM-DD).
+        countedTo:
+          type:
+            - string
+            - "null"
+          format: date
+          description: >-
+            Last day actually counted: `to`, or today when `to` is in the future (days after today are not counted). Omitted when the whole
+            range is in the future.
         groupId:
           type:
             - string
@@ -15715,6 +17132,18 @@ components:
                 type: integer
                 description: Absent.
                 minimum: 0
+              notArrivedChildDays:
+                type: integer
+                description: Expected but never arrived and no absence.
+                minimum: 0
+              unscheduledChildDays:
+                type: integer
+                description: Unscheduled present child-days.
+                minimum: 0
+              lateArrivals:
+                type: integer
+                description: Late arrivals.
+                minimum: 0
               attendanceRatePct:
                 type: number
                 description: Rate.
@@ -15726,8 +17155,86 @@ components:
               - expectedChildDays
               - presentChildDays
               - absentChildDays
+              - notArrivedChildDays
+              - unscheduledChildDays
+              - lateArrivals
               - attendanceRatePct
           description: Per-group breakdown.
+        byChild:
+          type: array
+          description: Per-child breakdown (one row per child and group), the basis of the CSV export.
+          items:
+            type: object
+            properties:
+              childId:
+                type: string
+                format: uuid
+                description: Child.
+              givenName:
+                type: string
+                description: Given name.
+              familyName:
+                type: string
+                description: Family name.
+              groupId:
+                type: string
+                format: uuid
+                description: Group.
+              groupName:
+                type: string
+                description: Group name.
+              expectedDays:
+                type: integer
+                minimum: 0
+                description: Expected days.
+              presentDays:
+                type: integer
+                minimum: 0
+                description: Present days.
+              absentSickDays:
+                type: integer
+                minimum: 0
+                description: Expected days absent with kind SICK.
+              absentVacationDays:
+                type: integer
+                minimum: 0
+                description: Expected days absent with kind VACATION.
+              absentOtherDays:
+                type: integer
+                minimum: 0
+                description: Expected days absent with kind OTHER.
+              notArrivedDays:
+                type: integer
+                minimum: 0
+                description: Expected, never arrived, no absence.
+              unscheduledDays:
+                type: integer
+                minimum: 0
+                description: Present without being expected.
+              lateArrivals:
+                type: integer
+                minimum: 0
+                description: Late arrivals.
+              attendanceRatePct:
+                type: number
+                minimum: 0
+                maximum: 100
+                description: present / expected × 100.
+            required:
+              - childId
+              - givenName
+              - familyName
+              - groupId
+              - groupName
+              - expectedDays
+              - presentDays
+              - absentSickDays
+              - absentVacationDays
+              - absentOtherDays
+              - notArrivedDays
+              - unscheduledDays
+              - lateArrivals
+              - attendanceRatePct
         byDate:
           type: array
           items:
@@ -15742,7 +17249,7 @@ components:
             required:
               - date
               - counters
-          description: Per-date breakdown (present when the range ≤ 62 days).
+          description: Per-date breakdown up to `countedTo` (empty unless the range is at most 62 days).
         generatedAt:
           type: string
           format: date-time
@@ -15751,10 +17258,9 @@ components:
         - organizationId
         - from
         - to
-        - groupId
-        - locationId
         - totals
         - byGroup
+        - byChild
         - byDate
         - generatedAt
     PrivacyRequest:
@@ -15966,19 +17472,20 @@ components:
         latestAnnouncements:
           type: array
           items:
-            $ref: "#/components/schemas/Announcement"
-          description: Up to 5 latest published announcements.
+            $ref: "#/components/schemas/DashboardAnnouncement"
+          description: Up to 5 latest published, unexpired announcements (reduced shape).
           maxItems: 5
         upcomingEvents:
           type: array
           items:
-            $ref: "#/components/schemas/CalendarEvent"
-          description: Up to 5 upcoming calendar events.
+            $ref: "#/components/schemas/DashboardEvent"
+          description: Up to 5 calendar events ending on or after `date` (reduced shape).
           maxItems: 5
         subscription:
           oneOf:
             - $ref: "#/components/schemas/Subscription"
             - type: "null"
+          description: Not returned by the current implementation.
         generatedAt:
           type: string
           format: date-time
@@ -15999,6 +17506,70 @@ components:
         - latestAnnouncements
         - upcomingEvents
         - generatedAt
+    DashboardAnnouncement:
+      type: object
+      description: Reduced announcement item of the dashboard.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Announcement id.
+        title:
+          type: string
+          description: Title.
+        status:
+          type: string
+          enum:
+            - PUBLISHED
+          description: Status (always PUBLISHED here).
+        publishedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: Published (RFC 3339 instant, UTC); omitted when null.
+      required:
+        - id
+        - title
+        - status
+    DashboardEvent:
+      type: object
+      description: Reduced calendar event item of the dashboard.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Event id.
+        kind:
+          type: string
+          description: Event kind (same values as `CalendarEvent.kind`).
+        title:
+          type: string
+          description: Title.
+        allDay:
+          type: boolean
+          description: All-day event.
+        startsOn:
+          type: string
+          format: date
+          description: First day (calendar date, YYYY-MM-DD).
+        endsOn:
+          type: string
+          format: date
+          description: Last day (calendar date, YYYY-MM-DD).
+        startsAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: Start instant for timed events (RFC 3339, UTC); omitted for all-day events.
+      required:
+        - id
+        - kind
+        - title
+        - allDay
+        - startsOn
+        - endsOn
     HealthLive:
       type: object
       properties:
@@ -16010,10 +17581,9 @@ components:
         timestamp:
           type: string
           format: date-time
-          description: Server time (RFC 3339 instant, UTC).
+          description: Server time (RFC 3339 instant, UTC). Not returned by the current implementation.
       required:
         - status
-        - timestamp
     HealthReady:
       type: object
       properties:
@@ -16026,35 +17596,20 @@ components:
         timestamp:
           type: string
           format: date-time
-          description: Server time (RFC 3339 instant, UTC).
+          description: Server time (RFC 3339 instant, UTC). Not returned by the current implementation.
         checks:
-          type: array
-          items:
-            type: object
-            properties:
-              name:
-                type: string
-                enum:
-                  - database
-                  - migrations
-                description: Check.
-              status:
-                type: string
-                enum:
-                  - UP
-                  - DOWN
-                description: Status.
-              durationMs:
-                type: integer
-                description: Duration.
-                minimum: 0
-            required:
-              - name
-              - status
-          description: Dependency checks. No connection strings or versions are exposed.
+          type: object
+          additionalProperties:
+            type: string
+            enum:
+              - UP
+              - DOWN
+            description: Check status.
+          description: >-
+            Dependency checks as a map of check name (`database`, `migrations`) to `UP`/`DOWN`, e.g. `{"database": "UP", "migrations":
+            "UP"}`. No connection strings or versions are exposed.
       required:
         - status
-        - timestamp
         - checks
     SessionPage:
       type: object
@@ -16077,7 +17632,7 @@ components:
       description: Cursor-paginated page of Notification items.
       required:
         - items
-        - nextCursor
+        - unreadCount
       properties:
         items:
           type: array
@@ -16087,7 +17642,11 @@ components:
           type:
             - string
             - "null"
-          description: Opaque cursor for the next page; null when there are no more items.
+          description: Opaque cursor for the next page; omitted when there are no more items.
+        unreadCount:
+          type: integer
+          minimum: 0
+          description: Total unread notifications of the caller (independent of filters and page), for the bell badge.
     OrganizationPage:
       type: object
       description: Cursor-paginated page of Organization items.

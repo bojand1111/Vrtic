@@ -22,6 +22,15 @@ BEGIN
   SELECT count(*) INTO n FROM app.organization_memberships;    IF n <> 0 THEN RAISE EXCEPTION 'no-context: memberships visible (%)', n; END IF; passed := passed + 1;
   SELECT count(*) INTO n FROM app.users;                       IF n <> 0 THEN RAISE EXCEPTION 'no-context: users visible (%)', n; END IF; passed := passed + 1;
   SELECT count(*) INTO n FROM app.sessions;                    IF n <> 0 THEN RAISE EXCEPTION 'no-context: sessions visible (%)', n; END IF; passed := passed + 1;
+  SELECT count(*) INTO n FROM app.children;                    IF n <> 0 THEN RAISE EXCEPTION 'no-context: children visible (%)', n; END IF; passed := passed + 1;
+  SELECT count(*) INTO n FROM app.guardians;                   IF n <> 0 THEN RAISE EXCEPTION 'no-context: guardians visible (%)', n; END IF; passed := passed + 1;
+  SELECT count(*) INTO n FROM app.absences;                    IF n <> 0 THEN RAISE EXCEPTION 'no-context: absences visible (%)', n; END IF; passed := passed + 1;
+  SELECT count(*) INTO n FROM app.attendance_days;             IF n <> 0 THEN RAISE EXCEPTION 'no-context: attendance_days visible (%)', n; END IF; passed := passed + 1;
+  SELECT count(*) INTO n FROM app.announcements;               IF n <> 0 THEN RAISE EXCEPTION 'no-context: announcements visible (%)', n; END IF; passed := passed + 1;
+  SELECT count(*) INTO n FROM app.messages;                    IF n <> 0 THEN RAISE EXCEPTION 'no-context: messages visible (%)', n; END IF; passed := passed + 1;
+  SELECT count(*) INTO n FROM app.conversations;               IF n <> 0 THEN RAISE EXCEPTION 'no-context: conversations visible (%)', n; END IF; passed := passed + 1;
+  SELECT count(*) INTO n FROM app.notifications;               IF n <> 0 THEN RAISE EXCEPTION 'no-context: notifications visible (%)', n; END IF; passed := passed + 1;
+  SELECT count(*) INTO n FROM app.closure_days;                IF n <> 0 THEN RAISE EXCEPTION 'no-context: closure_days visible (%)', n; END IF; passed := passed + 1;
 
   BEGIN
     INSERT INTO app.locations (organization_id, name) VALUES ('22222222-0000-0000-0000-000000000001', 'x');
@@ -59,7 +68,18 @@ BEGIN
   UPDATE app.locations SET name = 'hacked' WHERE organization_id = '22222222-0000-0000-0000-000000000002';
   GET DIAGNOSTICS n = ROW_COUNT;  IF n <> 0 THEN RAISE EXCEPTION 'tenant A: update touched % B rows', n; END IF; passed := passed + 1;
 
-  SELECT count(*) INTO n FROM app.sessions;        IF n <> 0 THEN RAISE EXCEPTION 'tenant A: sessions visible'; END IF; passed := passed + 1;
+  -- the acting user may see only their own sessions (sessions_self); a demo login must not break this test
+  SELECT count(*) INTO n FROM app.sessions WHERE user_id <> '11111111-0000-0000-0000-000000000011';
+  IF n <> 0 THEN RAISE EXCEPTION 'tenant A: other users sessions visible'; END IF; passed := passed + 1;
+  -- V5: children of tenant B (Jana Tomić) are invisible and cannot be linked from tenant A
+  SELECT count(*) INTO n FROM app.children WHERE organization_id = '22222222-0000-0000-0000-000000000002';
+  IF n <> 0 THEN RAISE EXCEPTION 'tenant A: tenant B children visible'; END IF; passed := passed + 1;
+  SELECT count(*) INTO n FROM app.children;  IF n = 0 THEN RAISE EXCEPTION 'tenant A: own children not visible'; END IF; passed := passed + 1;
+  BEGIN
+    INSERT INTO app.guardians (organization_id, child_id, membership_id, relationship) VALUES
+      ('22222222-0000-0000-0000-000000000002', '88888888-0000-0000-0000-000000000020', '33333333-0000-0000-0000-000000000092', 'OTHER');
+    RAISE EXCEPTION 'tenant A: insert guardian into tenant B was NOT denied';
+  EXCEPTION WHEN insufficient_privilege THEN passed := passed + 1; END;
   SELECT count(*) INTO n FROM app.platform_admins; IF n <> 0 THEN RAISE EXCEPTION 'tenant A: platform_admins visible'; END IF; passed := passed + 1;
 
   -- ---------------------------------------------------------------- 3. tenant B (Sunčica)

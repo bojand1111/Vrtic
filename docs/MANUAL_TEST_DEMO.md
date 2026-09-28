@@ -1,12 +1,18 @@
 # Vrtić Connect: ručno testiranje demo verzije (sve uloge)
 
 Pokretanje: desktop prečica **Vrtić Connect** (`scripts/start-vrtic.ps1`). Skripta podiže PostgreSQL (port 5433),
-primenjuje migracije (V1..V5), učitava demo podatke (`docs/database/seed/dev_seed.sql`, idempotentno), prvi put postavi
+primenjuje migracije (V1..V6), učitava demo podatke (`docs/database/seed/dev_seed.sql`, idempotentno), prvi put postavi
 lozinke demo naloga, pokreće API (:8080) i web (:5173) i otvara pregledač. Gašenje: **Vrtić Connect STOP**.
 
 Lozinka za sve demo naloge: `Pilot-Lozinka-2026!` (samo DEV baza; postavlja je `dev-set-password`, nije u repozitorijumu).
 Ako promenite lozinku u aplikaciji, skripta je neće pregaziti. Za ponovno postavljanje obrišite
 `C:\Posao\Vrtic-tools\demo-passwords.done` i ponovo pokrenite prečicu.
+
+**Dvostepena prijava (MFA):** vlasnik vrtića i platformski administrator posle lozinke moraju da podese potvrdu u dva
+koraka (SECURITY.md 2.1). Pri prvoj prijavi aplikacija otvara ekran sa QR kodom: skenirajte ga aplikacijom Google
+Authenticator ili Microsoft Authenticator, unesite 6-cifreni kod i sačuvajte 10 kodova za oporavak (prikazuju se samo
+jednom). Svaka sledeća prijava traži kod iz aplikacije ili jedan kod za oporavak. Administrator, vaspitači i roditelji
+nisu obavezni, ali mogu da uključe MFA na ekranu "Moj nalog".
 
 ## Demo nalozi
 
@@ -41,12 +47,19 @@ jelovnik za tekuću nedelju (dopunjava se svake nove nedelje pri pokretanju).
 9. Kalendar: sledeći mesec, novi događaj (ceo dan ili sa vremenom), izmena, brisanje.
 10. Obroci: izmeni dan (4 obroka, alergeni odvojeni zarezom), objavi.
 11. Podešavanja: vlasnik menja radno vreme i radne dane; administrator vidi isto samo za čitanje.
+12. Rasporedi: kartice "Očekivani danas" (izvor: neradni dan, odsustvo, izmena za dan, šablon), "Izmene" (kasne izmene su označene) i "Neradni dani" (dodaj budući neradni dan za ceo vrtić ili objekat; dan se odmah vidi u kalendaru i više nije "očekivan" na kontrolnoj tabli).
+13. Izveštaji: prisustvo za period i grupu (po grupi i po detetu), "Izvezi CSV" (samo vlasnik; fajl se otvara u Excelu sa ispravnim slovima), kartica "Dnevnik aktivnosti" (audit log sa filterima).
+14. Poruke: razgovori koje su roditelji započeli sa upravom (PARENT_ADMIN); odgovor se vidi roditelju.
+15. Naplata (vlasnik): plan, status probnog perioda, limiti i uključene funkcije. Plaćanje na mreži nije deo ove verzije.
+16. Moj nalog: promena lozinke, uključivanje MFA, kodovi za oporavak, lista uređaja sa odjavom pojedinačno ili svuda.
 
 ### Vaspitač (`vaspitac1`)
 1. Kontrolna tabla: moje grupe, obaveštenja, događaji, današnji jelovnik.
 2. Prisustvo: samo Bubamare; beleži dolazak i odlazak za danas.
 3. Deca / rasporedi / odsustva: samo deca iz njegove grupe, bez izmena.
 4. Obaveštenja: otvaranje obaveštenja ga označava kao pročitano (vidi se kod administratora u "Primaoci").
+5. Poruke i zvonce: kada roditelj pošalje poruku, zvonce u zaglavlju pokazuje broj nepročitanih; klik vodi na razgovor. Zvonce javlja i nova obaveštenja i odsustva dece iz grupe.
+6. Rasporedi, kartica "Izmene": izmene rasporeda za danas, kasne izmene označene.
 
 ### Roditelj (`roditelj01`)
 1. Kontrolna tabla: moja deca, obaveštenja, događaji, jelovnik.
@@ -54,11 +67,18 @@ jelovnik za tekuću nedelju (dopunjava se svake nove nedelje pri pokretanju).
 3. Odsustva: prijava odsustva (bolest, odmor, drugo) i otkazivanje svoje prijave; vaspitač i administrator odmah vide odsustvo.
 4. Prisustvo: status svoje dece za izabrani dan.
 5. Proba izolacije: roditelj ne vidi tuđu decu, a adresa `/employees` prikazuje poruku o zabranjenom pristupu.
+6. Rasporedi: nedeljni prikaz sa strelicama; "Promeni dan" menja samo taj datum (npr. dete ne dolazi u petak), "Vrati na šablon" poništava izmenu. Izmena posle roka (Podešavanja: rok u satima) je dozvoljena ali označena kao kasna.
+7. Poruke: "Nova poruka", izbor deteta i primaoca (vaspitači grupe ili uprava); vaspitač dobija notifikaciju.
 
 ### Drugi vrtić (`vlasnik@suncica.example.test`)
 Vidi samo Sunčicu (grupa Zvezdice, jedno dete). Nijedan podatak iz Happy Kids nije vidljiv.
 
+### Platformski administrator (`platform.admin@example.test`)
+Posle MFA: ekran "Organizacije": pretraga vrtića, "Novi vrtić" (naziv, slug, vremenska zona, e-pošta vlasnika; pozivnica
+vlasniku se u DEV okruženju ispisuje u prozoru "Vrtic API"), detalji vrtića, suspenzija i ponovno aktiviranje (traži lozinku),
+promena plana pretplate, funkcije po vrtiću.
+
 ## Šta nije deo ove verzije
-Fotografije, izveštaji, naplata i platformska administracija su i dalje ekrani-zamene. MFA (TOTP) nije implementiran,
-pa `platform.admin@example.test` dobija "MFA_REQUIRED" na platformskim ekranima. Zdravstveni profil deteta, poruke,
-saglasnosti, neradni dani i izmene rasporeda za pojedinačni dan nisu implementirani. Mobilna aplikacija nije menjana.
+Fotografije i saglasnosti (čuvanje fajlova), zdravstveni profil deteta (šifrovani podaci), stvarno slanje e-pošte i
+push notifikacija na telefon (nema provajdera; e-pošta se u DEV okruženju ispisuje u log), plaćanje na mreži i
+mobilna aplikacija (nije menjana, ne može se izgraditi na ovoj mašini).
