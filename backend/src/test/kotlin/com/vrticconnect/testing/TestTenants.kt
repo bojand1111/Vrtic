@@ -84,6 +84,19 @@ class TestTenants(private val config: AppConfig) {
     fun destroy() {
         ownerDb.transactionBlocking(DbContext.None) { c ->
             c.createStatement().use { it.execute("SELECT set_config('app.maintenance_mode', 'on', true)") }
+            // attendance_events is append-only (trigger + FK to memberships without cascade): remove the fixture's
+            // attendance days (cascading to visits and events) with the trigger disabled for this transaction only.
+            c.createStatement().use { it.execute("ALTER TABLE app.attendance_events DISABLE TRIGGER attendance_events_append_only") }
+            c.prepareStatement("DELETE FROM app.attendance_days WHERE organization_id IN (?, ?)").use { st ->
+                st.setObject(1, orgA); st.setObject(2, orgB); st.executeUpdate()
+            }
+            // deferred FK checks must fire before the table can be altered again in this transaction
+            c.createStatement().use { it.execute("SET CONSTRAINTS ALL IMMEDIATE") }
+            c.createStatement().use { it.execute("ALTER TABLE app.attendance_events ENABLE TRIGGER attendance_events_append_only") }
+            // announcement_audiences -> groups/locations has no cascade; drop the audience rules first
+            c.prepareStatement("DELETE FROM app.announcement_audiences WHERE organization_id IN (?, ?)").use { st ->
+                st.setObject(1, orgA); st.setObject(2, orgB); st.executeUpdate()
+            }
             c.prepareStatement("DELETE FROM app.organizations WHERE id IN (?, ?)").use { st ->
                 st.setObject(1, orgA); st.setObject(2, orgB); st.executeUpdate()
             }

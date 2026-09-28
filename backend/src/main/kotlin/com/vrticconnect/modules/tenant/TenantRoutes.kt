@@ -1,9 +1,22 @@
 package com.vrticconnect.modules.tenant
 
 import com.vrticconnect.authz.Authorize
+import com.vrticconnect.config.AppConfig
+import com.vrticconnect.modules.mail.MailSender
 import com.vrticconnect.db.Database
 import com.vrticconnect.db.DbContext
 import com.vrticconnect.http.ProblemException
+import com.vrticconnect.modules.absences.absenceRoutes
+import com.vrticconnect.modules.announcements.announcementRoutes
+import com.vrticconnect.modules.attendance.attendanceRoutes
+import com.vrticconnect.modules.calendar.calendarRoutes
+import com.vrticconnect.modules.children.childrenRoutes
+import com.vrticconnect.modules.dashboard.dashboardRoutes
+import com.vrticconnect.modules.groups.groupRoutes
+import com.vrticconnect.modules.locations.locationRoutes
+import com.vrticconnect.modules.meals.menuRoutes
+import com.vrticconnect.modules.schedules.scheduleRoutes
+import com.vrticconnect.modules.staff.staffRoutes
 import com.vrticconnect.modules.me.ChangePasswordRequest
 import com.vrticconnect.modules.me.LocaleUpdate
 import com.vrticconnect.modules.me.MeService
@@ -46,8 +59,23 @@ fun Route.tenantRoutes(
     settingsService: OrganizationSettingsService? = null,
     platformOrganizations: PlatformOrganizationService? = null,
     meService: MeService? = null,
+    tenantApi: TenantApi = TenantApi(sessionResolver, membershipResolver, database, csrfService),
+    appConfig: AppConfig? = null,
+    mailSender: MailSender? = null,
 ) {
     route("/organizations/{organizationId}") {
+        // E03+ business modules; each owns its routes, services and SQL.
+        locationRoutes(tenantApi)
+        groupRoutes(tenantApi)
+        if (appConfig != null && mailSender != null) staffRoutes(tenantApi, appConfig, mailSender) else staffRoutes(tenantApi)
+        childrenRoutes(tenantApi)
+        absenceRoutes(tenantApi)
+        scheduleRoutes(tenantApi)
+        attendanceRoutes(tenantApi)
+        announcementRoutes(tenantApi)
+        calendarRoutes(tenantApi)
+        menuRoutes(tenantApi)
+        dashboardRoutes(tenantApi)
         get("/ping") {
             val principal = requireTenant(sessionResolver, membershipResolver)
             val db = database ?: throw ProblemException.notImplemented("Tenant pipeline")

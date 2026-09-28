@@ -85,7 +85,7 @@ fun Application.module(deps: AppDependencies) {
         healthRoutes(deps.readiness)
         route("/api/v1") {
             authRoutes(deps.sessionResolver, deps.loginService, deps.sessionService, deps.csrfService, deps.sessionManagement, deps.config.isDev, deps.accountService, deps.reauthService)
-            tenantRoutes(deps.sessionResolver, deps.membershipResolver, deps.membershipService, deps.database, deps.accountService, deps.csrfService, deps.settingsService, deps.platformOrganizations, deps.meService)
+            tenantRoutes(deps.sessionResolver, deps.membershipResolver, deps.membershipService, deps.database, deps.accountService, deps.csrfService, deps.settingsService, deps.platformOrganizations, deps.meService, appConfig = deps.config, mailSender = deps.mailSender)
         }
     }
 }

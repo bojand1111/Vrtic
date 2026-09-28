@@ -99,6 +99,25 @@ fun Application.configureStatusPages() {
                 HttpStatusCode.UnprocessableEntity,
             )
         }
+        // Integrity violations raised by constraints (unique, exclusion, FK, CHECK) are client errors.
+        exception<java.sql.SQLException> { call, cause ->
+            val (status, detail) = when (cause.sqlState) {
+                "23505", "23P01" -> HttpStatusCode.Conflict to "CONSTRAINT_CONFLICT"
+                "23503", "23514", "23502", "22007", "22008", "22P02" -> HttpStatusCode.UnprocessableEntity to "CONSTRAINT_VIOLATION"
+                else -> HttpStatusCode.InternalServerError to null
+            }
+            if (status == HttpStatusCode.InternalServerError) log.error("Unhandled SQL error requestId={}", call.callId, cause)
+            else log.info("Constraint violation {} requestId={}", cause.sqlState, call.callId)
+            val type = when (status) {
+                HttpStatusCode.Conflict -> ProblemTypes.CONFLICT
+                HttpStatusCode.UnprocessableEntity -> ProblemTypes.VALIDATION
+                else -> ProblemTypes.INTERNAL
+            }
+            call.respondProblem(
+                Problem(type = type, title = status.description, status = status.value, detail = detail, instance = call.request.path(), requestId = call.callId),
+                status,
+            )
+        }
         exception<Throwable> { call, cause ->
             log.error("Unhandled error requestId={}", call.callId, cause)
             call.respondProblem(

@@ -180,12 +180,57 @@ class AccountService(
         c.prepareStatement("UPDATE app.invitations SET accepted_at = CURRENT_TIMESTAMP, accepted_user_id = ? WHERE id = ?").use { st ->
             st.setObject(1, userId); st.setObject(2, inv.id); st.executeUpdate()
         }
-        // PARENT invitations carry a child: the PENDING guardian link is created when EPIC 05 adds `guardians`.
+        createMemberProfile(c, inv, userId, membershipId)
         Audit.record(
             c, "INVITATION_ACCEPTED", "INVITATION", inv.id, actorUserId = userId, organizationId = inv.organizationId,
             actorMembershipId = membershipId, requestId = requestId, metadata = mapOf("role" to inv.role, "membershipId" to membershipId.toString()),
         )
         return membershipId
+    }
+
+    /**
+     * ADMIN/TEACHER get a staff profile (app.employees) and a PARENT invitation's child gets a PENDING
+     * guardian link (staff confirms it later). Both tables are tenant tables whose RLS requires the
+     * organization context, which the auth-mode transaction does not carry. The user is an ACTIVE
+     * member of [inv]'s organization at this point, so the same transaction switches to that tenant
+     * context for these two inserts and then restores the previous context (same commit, no policy change).
+     */
+    private fun createMemberProfile(c: Connection, inv: InvitationRow, userId: UUID, membershipId: UUID) {
+        if (inv.role != "ADMIN" && inv.role != "TEACHER" && inv.role != "PARENT") return
+        val childId = c.prepareStatement("SELECT child_id FROM app.invitations WHERE id = ?").use { st ->
+            st.setObject(1, inv.id)
+            st.executeQuery().use { rs -> if (rs.next()) rs.getObject("child_id", UUID::class.java) else null }
+        }
+        if (inv.role == "PARENT" && childId == null) return
+        val displayName = c.prepareStatement("SELECT given_name, family_name FROM app.users WHERE id = ?").use { st ->
+            st.setObject(1, userId)
+            st.executeQuery().use { rs -> if (rs.next()) "${rs.getString("given_name")} ${rs.getString("family_name")}".trim() else null }
+        } ?: inv.email
+        val saved = c.prepareStatement(
+            "SELECT current_setting('app.organization_id', true) AS o, current_setting('app.user_id', true) AS u, " +
+                "current_setting('app.auth_mode', true) AS a, current_setting('app.platform_mode', true) AS p",
+        ).use { st -> st.executeQuery().use { rs -> rs.next(); listOf(rs.getString("o"), rs.getString("u"), rs.getString("a"), rs.getString("p")) } }
+        Database.applyContext(c, DbContext.Tenant(inv.organizationId, userId))
+        // No try/finally: on failure the whole transaction rolls back and the transaction-local context goes with it.
+        if (inv.role == "PARENT") {
+            c.prepareStatement(
+                "INSERT INTO app.guardians (organization_id, child_id, membership_id, relationship, status) SELECT ?, ?, ?, 'OTHER', 'PENDING' " +
+                    "WHERE NOT EXISTS (SELECT 1 FROM app.guardians WHERE child_id = ? AND membership_id = ? AND status <> 'REVOKED')",
+            ).use { st ->
+                st.setObject(1, inv.organizationId); st.setObject(2, childId); st.setObject(3, membershipId)
+                st.setObject(4, childId); st.setObject(5, membershipId); st.executeUpdate()
+            }
+        } else {
+            c.prepareStatement(
+                "INSERT INTO app.employees (organization_id, membership_id, display_name, started_at) " +
+                    "SELECT o.id, ?, ?, (now() AT TIME ZONE o.timezone)::date FROM app.organizations o WHERE o.id = ? " +
+                    "ON CONFLICT (membership_id) DO NOTHING",
+            ).use { st -> st.setObject(1, membershipId); st.setString(2, displayName); st.setObject(3, inv.organizationId); st.executeUpdate() }
+        }
+        // Back to the caller's context (auth mode) for the rest of the registration/acceptance.
+        c.prepareStatement(
+            "SELECT set_config('app.organization_id', ?, true), set_config('app.user_id', ?, true), set_config('app.auth_mode', ?, true), set_config('app.platform_mode', ?, true)",
+        ).use { st -> saved.forEachIndexed { i, v -> st.setString(i + 1, v ?: "") }; st.executeQuery().close() }
     }
 
     // ------------------------------------------------------------------ e-mail verification (E02-B05)

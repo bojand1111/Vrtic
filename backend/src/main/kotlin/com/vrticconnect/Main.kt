@@ -22,7 +22,7 @@ private val log = LoggerFactory.getLogger("com.vrticconnect.Main")
  *  - `serve`            : run the HTTP API with the runtime (RLS-bound) database role.
  *  - `migrate`          : run Flyway migrations with the owner role, then exit (single migration job).
  *  - `benchmark-argon2` : measure Argon2id hashing time for the configured parameters.
- *  - `dev-set-password <email>` : DEV ONLY (E02-D03). Hashes SEED_DEV_PASSWORD from the environment and stores it
+ *  - `dev-set-password <email>...` : DEV ONLY (E02-D03), one or more e-mails. Hashes SEED_DEV_PASSWORD from the environment and stores it
  *                         for a seeded account so the dev seed never contains a password. Refuses outside APP_ENV=dev.
  */
 fun main(args: Array<String>) {
@@ -32,7 +32,7 @@ fun main(args: Array<String>) {
         "serve" -> serve(config)
         "migrate" -> migrate(config)
         "benchmark-argon2" -> benchmarkArgon2(config)
-        "dev-set-password" -> devSetPassword(config, args.getOrNull(1))
+        "dev-set-password" -> args.drop(1).ifEmpty { listOf(null) }.forEach { devSetPassword(config, it) }
         else -> {
             System.err.println("Unknown command '$command'. Use: serve | migrate | benchmark-argon2 | dev-set-password <email>")
             exitProcess(2)
