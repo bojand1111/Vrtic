@@ -12,6 +12,7 @@ import com.vrticconnect.http.FieldError
 import com.vrticconnect.http.ProblemException
 import com.vrticconnect.http.conflict
 import com.vrticconnect.http.validate
+import com.vrticconnect.modules.notifications.NotificationWriter
 import com.vrticconnect.modules.tenant.TenantPrincipal
 import com.vrticconnect.modules.tenant.audit
 import java.sql.Connection
@@ -60,6 +61,7 @@ object GuardianService {
             body.canReportAbsence, body.canGiveConsent, body.canViewHealth, principal.user.userId,
         ) { it.uuid("id") }!!
         principal.audit(c, "GUARDIAN_LINKED", "GUARDIAN", id, requestId, mapOf("membershipId" to membershipId.toString()))
+        NotificationWriter.guardianConfirmed(c, principal, id)
         return byId(c, id)
     }
 
@@ -78,6 +80,7 @@ object GuardianService {
         if (parentRoleTaken(c, childId, relationship, guardianId)) throw conflict("RELATIONSHIP_TAKEN")
         c.update("UPDATE app.guardians SET status = 'CONFIRMED', confirmed_by = ?, confirmed_at = now() WHERE id = ?", principal.user.userId, guardianId)
         principal.audit(c, "GUARDIAN_CONFIRMED", "GUARDIAN", guardianId, requestId)
+        NotificationWriter.guardianConfirmed(c, principal, guardianId)
         return byId(c, guardianId)
     }
 

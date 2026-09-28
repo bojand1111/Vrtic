@@ -94,7 +94,7 @@ class AttendanceQueries(private val api: TenantApi) {
         }
         val now = Instant.now().truncatedTo(ChronoUnit.SECONDS)
         return DailyOverview(
-            groupId = groupId.toString(), date = date.toString(), timezone = clock.zone.id, isClosure = false,
+            groupId = groupId.toString(), date = date.toString(), timezone = clock.zone.id, isClosure = AttendancePlanning.groupClosure(c, groupId, date) != null,
             lateArrivalGraceMinutes = clock.graceMinutes, counters = counters(children), children = children,
             generatedAt = now.toString(), snapshotValidUntil = now.plus(clock.cacheTtlHours.toLong(), ChronoUnit.HOURS).toString(),
         )

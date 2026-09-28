@@ -18,6 +18,7 @@ import com.vrticconnect.http.conflict
 import com.vrticconnect.http.invalidQuery
 import com.vrticconnect.http.validate
 import com.vrticconnect.modules.children.ChildrenService
+import com.vrticconnect.modules.notifications.NotificationWriter
 import com.vrticconnect.modules.tenant.TenantPrincipal
 import com.vrticconnect.modules.tenant.audit
 import io.ktor.http.Parameters
@@ -153,6 +154,7 @@ object AbsenceService {
             principal.membership.membershipId,
         ) { it.uuid("id") }!!
         principal.audit(c, "ABSENCE_REPORTED", "ABSENCE", id, requestId)
+        NotificationWriter.absenceChanged(c, principal, id, childId, from!!, to!!, Scopes.today(c), "reported")
         return byId(c, principal, id)
     }
 
@@ -172,7 +174,11 @@ object AbsenceService {
             principal.membership.membershipId, absenceId,
         )
         principal.audit(c, "ABSENCE_CANCELLED", "ABSENCE", absenceId, requestId)
-        return byId(c, principal, absenceId)
+        val cancelled = byId(c, principal, absenceId)
+        NotificationWriter.absenceChanged(
+            c, principal, absenceId, row.childId, LocalDate.parse(cancelled.dateFrom), LocalDate.parse(cancelled.dateTo), Scopes.today(c), "cancelled",
+        )
+        return cancelled
     }
 
     /** ACTIVE absence of each child covering [date] (used by the schedule views). */

@@ -10,11 +10,14 @@ import com.vrticconnect.modules.absences.absenceRoutes
 import com.vrticconnect.modules.announcements.announcementRoutes
 import com.vrticconnect.modules.attendance.attendanceRoutes
 import com.vrticconnect.modules.calendar.calendarRoutes
+import com.vrticconnect.modules.billing.billingRoutes
 import com.vrticconnect.modules.children.childrenRoutes
 import com.vrticconnect.modules.dashboard.dashboardRoutes
 import com.vrticconnect.modules.groups.groupRoutes
 import com.vrticconnect.modules.locations.locationRoutes
 import com.vrticconnect.modules.meals.menuRoutes
+import com.vrticconnect.modules.messaging.messagingRoutes
+import com.vrticconnect.modules.reports.reportRoutes
 import com.vrticconnect.modules.schedules.scheduleRoutes
 import com.vrticconnect.modules.staff.staffRoutes
 import com.vrticconnect.modules.me.ChangePasswordRequest
@@ -76,6 +79,9 @@ fun Route.tenantRoutes(
         calendarRoutes(tenantApi)
         menuRoutes(tenantApi)
         dashboardRoutes(tenantApi)
+        messagingRoutes(tenantApi)
+        reportRoutes(tenantApi)
+        billingRoutes(tenantApi)
         get("/ping") {
             val principal = requireTenant(sessionResolver, membershipResolver)
             val db = database ?: throw ProblemException.notImplemented("Tenant pipeline")

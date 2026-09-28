@@ -17,30 +17,24 @@ import com.vrticconnect.db.uuid
 import com.vrticconnect.http.ProblemException
 import com.vrticconnect.http.invalidQuery
 import com.vrticconnect.http.validate
-import com.vrticconnect.modules.absences.AbsenceService
 import com.vrticconnect.modules.children.ChildrenService
 import com.vrticconnect.modules.tenant.TenantPrincipal
 import com.vrticconnect.modules.tenant.audit
 import java.sql.Connection
 import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.LocalTime
-import java.time.ZoneId
 import java.util.UUID
 
 /**
- * Weekly schedule templates and the views computed from template + absences. Day overrides,
- * closure days and frozen daily plans are not available yet (no tables), so `source` is only
- * ABSENCE / TEMPLATE / NONE and the week PUT (overrides) is not implemented.
+ * Weekly schedule templates and the views computed by [ScheduleResolver] (closure > absence > override >
+ * template > none). Day overrides live in [DayOverrideService], closure days in [ClosureDayService].
+ * Not implemented: the atomic week PUT, preview and stored daily plans (days are computed on request;
+ * a day is frozen once it is in the past or attendance was recorded for it).
  */
 object ScheduleService {
 
     data class OrgSchedule(val opens: LocalTime, val closes: LocalTime, val weekdays: Set<Int>, val deadlineHours: Int, val timezone: String)
-
-    private data class Template(val id: UUID, val childId: UUID, val from: LocalDate, val to: LocalDate?, val version: Int, val days: Map<Int, TemplateDayDto>) {
-        fun covers(d: LocalDate) = !from.isAfter(d) && (to == null || !to.isBefore(d))
-    }
 
     fun orgSchedule(c: Connection): OrgSchedule {
         val tz = c.queryOne("SELECT timezone FROM app.organizations WHERE id = app.current_organization_id()") { it.getString("timezone") } ?: "Europe/Belgrade"
@@ -99,6 +93,8 @@ object ScheduleService {
             "SELECT id, effective_from, effective_to FROM app.schedule_templates WHERE child_id = ? ORDER BY effective_from FOR UPDATE", childId,
         ) { Triple(it.uuid("id"), it.date("effective_from"), it.dateOrNull("effective_to")) }
         val same = existing.firstOrNull { it.second == from }
+        val previous = (same ?: existing.firstOrNull { it.second.isBefore(from) && (it.third == null || !it.third!!.isBefore(from)) })
+            ?.let { ScheduleResolver.templates(c, "t.id = ?", it.first).singleOrNull() }
         val templateId: UUID
         if (same != null) {
             templateId = same.first
@@ -122,8 +118,13 @@ object ScheduleService {
                 d.arrivalTime?.let { LocalTime.parse(it) }, d.departureTime?.let { LocalTime.parse(it) },
             )
         }
+        val saved = templates(c, "t.id = ?", templateId).single()
+        ScheduleChanges.append(
+            c, principal, childId, "TEMPLATE_REPLACED", from, saved.effectiveTo?.let(LocalDate::parse), ScheduleResolver.isLate(org, from),
+            previous?.let { ScheduleChanges.templateState(it.from, it.days.values) }, ScheduleChanges.templateState(from, days),
+        )
         principal.audit(c, "TEMPLATE_REPLACED", "SCHEDULE_TEMPLATE", templateId, requestId)
-        return templates(c, "t.id = ?", templateId).single() to (same == null)
+        return saved to (same == null)
     }
 
     fun week(c: Connection, principal: TenantPrincipal, childId: UUID, weekStartParam: LocalDate?): WeekScheduleDto {
@@ -136,47 +137,46 @@ object ScheduleService {
         val weekEnd = weekStart.plusDays(6)
         val org = orgSchedule(c)
         val canManage = canManage(c, principal, childId)
-        val templates = rawTemplates(
-            c, "t.child_id = ? AND t.effective_from <= ? AND (t.effective_to IS NULL OR t.effective_to >= ?)", childId, weekEnd, weekStart,
-        )
-        val absences = c.queryList(
-            "SELECT id, date_from, date_to FROM app.absences WHERE child_id = ? AND status = 'ACTIVE' AND date_from <= ? AND date_to >= ?",
-            childId, weekEnd, weekStart,
-        ) { Triple(it.uuid("id"), it.date("date_from"), it.date("date_to")) }
-        val zone = runCatching { ZoneId.of(org.timezone) }.getOrDefault(ZoneId.of("Europe/Belgrade"))
-        val deadline = LocalDateTime.now(zone).plusHours(org.deadlineHours.toLong())
-        val used = mutableSetOf<Template>()
+        val snapshot = ScheduleResolver.load(c, listOf(childId), weekStart, weekEnd, org)
+        val recorded = c.queryList(
+            "SELECT attendance_date FROM app.attendance_days WHERE child_id = ? AND attendance_date BETWEEN ? AND ?", childId, weekStart, weekEnd,
+        ) { it.date("attendance_date") }.toSet()
+        var version = 0
+        val usedTemplates = mutableSetOf<UUID>()
         val days = (0L..6L).map { offset ->
             val date = weekStart.plusDays(offset)
             val weekday = date.dayOfWeek.value
-            val absence = absences.firstOrNull { !it.second.isAfter(date) && !it.third.isBefore(date) }
-            val template = templates.firstOrNull { it.covers(date) }?.also { used += it }
-            val day = template?.days?.get(weekday)
-            val frozen = date.isBefore(today)
-            val (source, expected) = when {
-                weekday !in org.weekdays -> "NONE" to false
-                absence != null -> "ABSENCE" to false
-                template != null -> "TEMPLATE" to (day?.attends == true)
-                else -> "NONE" to false
-            }
+            val e = snapshot.resolve(childId, date)
+            val override = snapshot.override(childId, date)
+            val template = snapshot.template(childId, date)
+            template?.let { if (usedTemplates.add(it.id)) version += it.version }
+            override?.let { version += it.version }
+            val templateDay = template?.days?.get(weekday)
+            val frozen = date.isBefore(today) || date in recorded
             ScheduleDayDto(
-                date = date.toString(), weekday = weekday, isExpected = expected,
-                expectedArrival = if (expected) day?.arrivalTime else null, expectedDeparture = if (expected) day?.departureTime else null,
-                source = source, isLateChange = false, overrideId = null, absenceId = absence?.first?.toString(), closureDayId = null,
-                isFrozen = frozen, isEditable = canManage && !frozen && date.atStartOfDay().isAfter(deadline),
+                date = date.toString(), weekday = weekday, isExpected = e.isExpected,
+                expectedArrival = e.arrival?.hhmm(), expectedDeparture = e.departure?.hhmm(),
+                source = e.source, isLateChange = override?.isLateChange ?: false, overrideId = override?.id?.toString(),
+                absenceId = e.absence?.id?.toString(), closureDayId = e.closure?.id?.toString(),
+                isFrozen = frozen, isEditable = canManage && !frozen && e.closure == null && e.isWorkingDay,
+                overrideVersion = override?.version ?: 0, overrideReason = override?.reason, closureName = e.closure?.name,
+                absenceKind = e.absence?.kind, templateAttends = template?.let { templateDay?.attends == true },
+                templateArrival = templateDay?.takeIf { it.attends }?.arrivalTime, templateDeparture = templateDay?.takeIf { it.attends }?.departureTime,
+                changeDeadline = ScheduleResolver.cutoff(org, date).toString(),
             )
         }
-        return WeekScheduleDto(childId.toString(), weekStart.toString(), org.timezone, used.sumOf { it.version }, days, org.deadlineHours)
+        return WeekScheduleDto(childId.toString(), weekStart.toString(), org.timezone, version, days, org.deadlineHours)
     }
 
-    /** Addition: children enrolled in a group on [date] with their expected times (managers, TEACHER of the group). */
+    /** Addition: children enrolled in a group on [date] with their effective expectation (managers, TEACHER of the group). */
     fun expected(c: Connection, principal: TenantPrincipal, groupId: UUID, dateParam: LocalDate?): ExpectedChildrenDto {
         Authorize.require(principal, Permission.SCHEDULE_READ)
         if (principal.membership.role == Role.PARENT) throw Authorize.forbidden()
         val date = dateParam ?: Scopes.today(c)
         val groups = Scopes.groupIds(c, principal, date)
         if (groups != null && groupId !in groups) throw ProblemException.notFound()
-        c.queryOne("SELECT 1 AS ok FROM app.groups WHERE id = ? AND deleted_at IS NULL", groupId) { true } ?: throw ProblemException.notFound()
+        val locationId = c.queryOne("SELECT location_id FROM app.groups WHERE id = ? AND deleted_at IS NULL", groupId) { it.uuid("location_id") }
+            ?: throw ProblemException.notFound()
         val org = orgSchedule(c)
         val weekday = date.dayOfWeek.value
         val working = weekday in org.weekdays
@@ -187,62 +187,37 @@ object ScheduleService {
                 "AND ch.deleted_at IS NULL AND ch.status = 'ACTIVE' ORDER BY ch.family_name, ch.given_name, ch.id",
             groupId, date, date,
         ) { Kid(it.uuid("id"), it.getString("given_name"), it.getString("family_name")) }
-        val ids = kids.map { it.id }
-        val templates: Map<UUID, Template> = if (ids.isEmpty()) emptyMap() else rawTemplates(
-            c, "t.child_id = ANY(?) AND t.effective_from <= ? AND (t.effective_to IS NULL OR t.effective_to >= ?)",
-            SqlArray("uuid", ids), date, date,
-        ).associateBy { it.childId }
-        val absences = AbsenceService.activeOn(c, ids, date)
+        val snapshot = ScheduleResolver.load(c, kids.map { it.id }, date, date, org)
         val items = kids.map { k ->
-            val day = templates[k.id]?.days?.get(weekday)
-            val absence = absences[k.id]
-            val (source, expected) = when {
-                !working -> "NONE" to false
-                absence != null -> "ABSENCE" to false
-                templates[k.id] != null -> "TEMPLATE" to (day?.attends == true)
-                else -> "NONE" to false
-            }
+            val e = snapshot.resolve(k.id, date)
             ExpectedChildDto(
-                childId = k.id.toString(), givenName = k.given, familyName = k.family, isExpected = expected,
-                expectedArrival = if (expected) day?.arrivalTime else null, expectedDeparture = if (expected) day?.departureTime else null,
-                source = source, absenceId = absence?.first?.toString(), absenceKind = absence?.second,
+                childId = k.id.toString(), givenName = k.given, familyName = k.family, isExpected = e.isExpected,
+                expectedArrival = e.arrival?.hhmm(), expectedDeparture = e.departure?.hhmm(),
+                source = e.source, absenceId = e.absence?.id?.toString(), absenceKind = e.absence?.kind,
+                overrideId = e.override?.id?.toString(), overrideReason = e.override?.reason, isLateChange = e.override?.isLateChange ?: false,
+                closureDayId = e.closure?.id?.toString(),
             )
         }
-        return ExpectedChildrenDto(groupId.toString(), date.toString(), weekday, working, items)
+        val closure = snapshot.closureOfLocation(locationId, date)
+        return ExpectedChildrenDto(groupId.toString(), date.toString(), weekday, working, items, closure?.id?.toString(), closure?.name)
     }
 
     /** Managers: any child; PARENT: confirmed guardian with `can_manage_schedule` (404 outside scope, 403 without the flag). */
-    private fun requireManage(c: Connection, principal: TenantPrincipal, childId: UUID) {
+    fun requireManage(c: Connection, principal: TenantPrincipal, childId: UUID) {
         Scopes.requireChild(c, principal, childId)
         ChildrenService.requireChildExists(c, childId)
         if (!canManage(c, principal, childId)) throw Authorize.forbidden()
     }
 
-    private fun canManage(c: Connection, principal: TenantPrincipal, childId: UUID): Boolean = when {
+    fun canManage(c: Connection, principal: TenantPrincipal, childId: UUID): Boolean = when {
         !Authorize.has(principal, Permission.SCHEDULE_MANAGE) -> false
         Scopes.isManager(principal) -> true
         principal.membership.role == Role.PARENT -> Scopes.guardianCan(c, principal, childId, "can_manage_schedule")
         else -> false
     }
 
-    private fun rawTemplates(c: Connection, where: String, vararg params: Any?): List<Template> {
-        val rows = c.queryList(
-            "SELECT t.id, t.child_id, t.effective_from, t.effective_to, t.version, d.weekday, d.attends, d.arrival_time, d.departure_time " +
-                "FROM app.schedule_templates t LEFT JOIN app.schedule_template_days d ON d.template_id = t.id WHERE $where",
-            *params,
-        ) { rs ->
-            val weekday = rs.getInt("weekday").takeUnless { rs.wasNull() }
-            val day = weekday?.let { TemplateDayDto(it, rs.getBoolean("attends"), rs.timeOrNull("arrival_time")?.hhmm(), rs.timeOrNull("departure_time")?.hhmm()) }
-            Triple(listOf(rs.uuid("id"), rs.uuid("child_id")), Triple(rs.date("effective_from"), rs.dateOrNull("effective_to"), rs.getInt("version")), day)
-        }
-        return rows.groupBy { it.first }.map { (ids, list) ->
-            val meta = list.first().second
-            Template(ids[0], ids[1], meta.first, meta.second, meta.third, list.mapNotNull { it.third }.associateBy { it.weekday })
-        }
-    }
-
     private fun templates(c: Connection, where: String, vararg params: Any?): List<ScheduleTemplateDto> {
-        val raw = rawTemplates(c, where, *params)
+        val raw = ScheduleResolver.templates(c, where, *params)
         if (raw.isEmpty()) return emptyList()
         val meta = c.queryList(
             "SELECT id, created_by_membership_id, created_at FROM app.schedule_templates WHERE id = ANY(?)", SqlArray("uuid", raw.map { it.id }),

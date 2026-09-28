@@ -7,6 +7,7 @@ import com.vrticconnect.db.queryOne
 import com.vrticconnect.db.timeOrNull
 import com.vrticconnect.db.uuid
 import com.vrticconnect.db.uuidOrNull
+import com.vrticconnect.modules.schedules.ScheduleResolver
 import java.sql.Connection
 import java.time.Instant
 import java.time.LocalDate
@@ -24,7 +25,7 @@ data class OrgClock(
     val cacheTtlHours: Int,
 )
 
-/** Expected attendance of a child on a date (weekly template, else working weekday). */
+/** Expected attendance of a child on a date (closure, day override, weekly template, else working weekday). */
 data class DayPlan(val isExpected: Boolean, val arrival: LocalTime?, val departure: LocalTime?)
 
 object AttendancePlanning {
@@ -56,20 +57,21 @@ object AttendancePlanning {
             childId, date, date,
         ) { it.uuidOrNull("group_id") }
 
-    fun plans(c: Connection, childIds: Collection<UUID>, date: LocalDate, clock: OrgClock): Map<UUID, DayPlan> {
+    /**
+     * Expected attendance per child on [date] from the shared schedule resolver: closure day -> not expected,
+     * day override, weekly template, else (no template) the working weekday. Absences are separate context
+     * ([absences]). Frozen into attendance_days at the first event (see AttendanceCommands.lockDay).
+     */
+    fun plans(c: Connection, childIds: Collection<UUID>, date: LocalDate, @Suppress("UNUSED_PARAMETER") clock: OrgClock): Map<UUID, DayPlan> {
         if (childIds.isEmpty()) return emptyMap()
-        val weekday = date.dayOfWeek.value
-        val fromTemplates = c.queryList(
-            "SELECT t.child_id, d.attends, d.arrival_time, d.departure_time FROM app.schedule_templates t " +
-                "LEFT JOIN app.schedule_template_days d ON d.template_id = t.id AND d.weekday = ? " +
-                "WHERE t.child_id = ANY(?) AND t.effective_from <= ? AND (t.effective_to IS NULL OR t.effective_to >= ?)",
-            weekday, SqlArray("uuid", childIds.toList()), date, date,
-        ) { rs ->
-            val attends = rs.getBoolean("attends") && !rs.wasNull()
-            rs.uuid("child_id") to DayPlan(attends, rs.timeOrNull("arrival_time"), rs.timeOrNull("departure_time"))
-        }.toMap()
-        val default = DayPlan(weekday in clock.workingWeekdays, null, null)
-        return childIds.associateWith { fromTemplates[it] ?: default }
+        val snapshot = ScheduleResolver.load(c, childIds, date, date)
+        return childIds.associateWith { id -> snapshot.attendancePlan(id, date).let { DayPlan(it.isExpected, it.arrival, it.departure) } }
+    }
+
+    /** Closure day (organization-wide or of the group's location) on [date], or null. */
+    fun groupClosure(c: Connection, groupId: UUID, date: LocalDate): ScheduleResolver.Closure? {
+        val location = c.queryOne("SELECT location_id FROM app.groups WHERE id = ?", groupId) { it.uuidOrNull("location_id") }
+        return ScheduleResolver.load(c, emptyList(), date, date).closureOfLocation(location, date)
     }
 
     /** Kind of an ACTIVE absence covering [date], per child. */

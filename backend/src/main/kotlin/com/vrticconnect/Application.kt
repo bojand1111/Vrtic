@@ -8,8 +8,10 @@ import com.vrticconnect.modules.auth.Argon2idPasswordHasher
 import com.vrticconnect.modules.auth.DatabaseSessionResolver
 import com.vrticconnect.modules.auth.CsrfService
 import com.vrticconnect.modules.auth.LoginService
+import com.vrticconnect.modules.auth.MfaService
 import com.vrticconnect.modules.auth.NotImplementedSessionResolver
 import com.vrticconnect.modules.auth.ReauthService
+import com.vrticconnect.modules.auth.SecretBox
 import com.vrticconnect.modules.auth.SessionResolver
 import com.vrticconnect.modules.auth.SessionManagementService
 import com.vrticconnect.modules.auth.SessionService
@@ -20,8 +22,12 @@ import com.vrticconnect.modules.mail.LoggingMailSender
 import com.vrticconnect.modules.mail.MailSender
 import com.vrticconnect.modules.mail.UnconfiguredMailSender
 import com.vrticconnect.modules.me.MeService
+import com.vrticconnect.modules.notifications.notificationRoutes
 import com.vrticconnect.modules.organizations.OrganizationSettingsService
+import com.vrticconnect.modules.platform.PlatformAdminService
+import com.vrticconnect.modules.platform.PlatformBillingService
 import com.vrticconnect.modules.platform.PlatformOrganizationService
+import com.vrticconnect.modules.platform.platformAdminRoutes
 import com.vrticconnect.modules.tenant.DatabaseMembershipResolver
 import com.vrticconnect.modules.tenant.MembershipResolver
 import com.vrticconnect.modules.tenant.MembershipService
@@ -68,10 +74,15 @@ class AppDependencies(
     /** E02-B15 examples of the authorization layer: tenant settings and the platform organization list. */
     val settingsService: OrganizationSettingsService? = database?.let(::OrganizationSettingsService),
     val platformOrganizations: PlatformOrganizationService? = database?.let(::PlatformOrganizationService),
+    /** E02-B11: TOTP enrollment/verification; the data key is required here, so a non-DEV start without APP_DATA_KEY fails fast. */
+    val mfaService: MfaService? = database?.let { MfaService(it, SecretBox(config.requireDataKey()), rateLimiter) },
     /** E02-B10: re-authentication for sensitive actions. */
-    val reauthService: ReauthService? = database?.let { ReauthService(it, Argon2idPasswordHasher(config.argon2), rateLimiter) },
+    val reauthService: ReauthService? = database?.let { ReauthService(it, Argon2idPasswordHasher(config.argon2), rateLimiter, mfaService) },
     /** E02-B16: `/me` profile, locale and password change. */
     val meService: MeService? = database?.let { MeService(it, Argon2idPasswordHasher(config.argon2), rateLimiter) },
+    /** Platform administration: tenant creation with OWNER invitation, suspension, subscriptions, feature flags. */
+    val platformAdmin: PlatformAdminService? = database?.let { PlatformAdminService(it, mailSender, config.webOrigin) },
+    val platformBilling: PlatformBillingService? = database?.let(::PlatformBillingService),
 )
 
 fun Application.module(deps: AppDependencies) {
@@ -84,8 +95,10 @@ fun Application.module(deps: AppDependencies) {
     routing {
         healthRoutes(deps.readiness)
         route("/api/v1") {
-            authRoutes(deps.sessionResolver, deps.loginService, deps.sessionService, deps.csrfService, deps.sessionManagement, deps.config.isDev, deps.accountService, deps.reauthService)
+            authRoutes(deps.sessionResolver, deps.loginService, deps.sessionService, deps.csrfService, deps.sessionManagement, deps.config.isDev, deps.accountService, deps.reauthService, deps.mfaService)
             tenantRoutes(deps.sessionResolver, deps.membershipResolver, deps.membershipService, deps.database, deps.accountService, deps.csrfService, deps.settingsService, deps.platformOrganizations, deps.meService, appConfig = deps.config, mailSender = deps.mailSender)
+            platformAdminRoutes(deps.sessionResolver, deps.csrfService, deps.platformAdmin, deps.platformBilling)
+            notificationRoutes(deps.sessionResolver, deps.database, deps.csrfService)
         }
     }
 }

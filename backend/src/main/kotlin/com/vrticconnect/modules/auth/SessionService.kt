@@ -25,15 +25,42 @@ data class SessionMembershipResponse(
     val role: String,
 )
 
+/**
+ * `GET /auth/session`. Keeps the historical `user` shape the SPA reads and adds the contract's
+ * `CurrentSession` session fields plus the E02-B12 MFA state (`mfaRequired`: this session must pass
+ * `POST /auth/mfa/totp/verify`; `mfaEnrollmentRequired`: MFA is mandatory and not enrolled yet).
+ */
 @Serializable
-data class SessionResponse(val user: SessionUserResponse)
+data class SessionResponse(
+    val user: SessionUserResponse,
+    val userId: String,
+    val sessionId: String,
+    val clientKind: String,
+    val mfaVerified: Boolean,
+    val mfaEnabled: Boolean,
+    val mfaRequired: Boolean,
+    val mfaEnrollmentRequired: Boolean,
+    val reauthenticatedAt: String? = null,
+    val absoluteExpiresAt: String,
+)
 
 /** Returns the minimal user shape already consumed by the admin SPA tenant bootstrap. */
 class SessionService(private val database: Database) {
     suspend fun current(call: ApplicationCall, resolver: SessionResolver) {
         val authenticated = resolver.resolve(call) ?: throw ProblemException.unauthenticated()
-        val user = database.transaction(DbContext.User(authenticated.userId)) { connection ->
-            findUser(connection, authenticated.userId)
+        val (user, session) = database.transaction(DbContext.User(authenticated.userId)) { connection ->
+            val user = findUser(connection, authenticated.userId) ?: return@transaction null
+            val session = connection.prepareStatement(
+                "SELECT client_kind, reauthenticated_at, absolute_expires_at FROM app.sessions WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
+            ).use { statement ->
+                statement.setObject(1, authenticated.sessionId)
+                statement.setObject(2, authenticated.userId)
+                statement.executeQuery().use { rs ->
+                    if (!rs.next()) return@transaction null
+                    Triple(rs.getString("client_kind"), rs.getTimestamp("reauthenticated_at")?.toInstant()?.toString(), rs.getTimestamp("absolute_expires_at").toInstant().toString())
+                }
+            }
+            user to session
         } ?: throw ProblemException.unauthenticated()
 
         call.respond(
@@ -45,6 +72,15 @@ class SessionService(private val database: Database) {
                     isPlatformAdmin = authenticated.isPlatformAdmin,
                     memberships = user.memberships,
                 ),
+                userId = user.id.toString(),
+                sessionId = authenticated.sessionId.toString(),
+                clientKind = session.first,
+                mfaVerified = authenticated.mfaVerified,
+                mfaEnabled = authenticated.mfaEnabled,
+                mfaRequired = authenticated.mfaVerificationRequired,
+                mfaEnrollmentRequired = authenticated.mfaEnrollmentRequired,
+                reauthenticatedAt = session.second,
+                absoluteExpiresAt = session.third,
             ),
         )
     }

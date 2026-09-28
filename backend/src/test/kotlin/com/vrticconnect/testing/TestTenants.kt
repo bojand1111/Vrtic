@@ -54,7 +54,7 @@ class TestTenants(private val config: AppConfig) {
                 val email = "fixture-$name-$tag@example.test".lowercase()
                 insertUser(c, id, email, name)
                 emails[id] = email
-                tokens[id] = insertSessionWithToken(c, id)
+                tokens[id] = insertSessionWithToken(c, id, mfaVerified = id == userOwner)
             }
             c.prepareStatement("INSERT INTO app.platform_admins (user_id, note) VALUES (?, 'fixture')").use { st ->
                 st.setObject(1, platformAdmin); st.executeUpdate()
@@ -90,9 +90,19 @@ class TestTenants(private val config: AppConfig) {
             c.prepareStatement("DELETE FROM app.attendance_days WHERE organization_id IN (?, ?)").use { st ->
                 st.setObject(1, orgA); st.setObject(2, orgB); st.executeUpdate()
             }
+            // schedule_change_log is append-only too; same pattern
+            c.createStatement().use { it.execute("ALTER TABLE app.schedule_change_log DISABLE TRIGGER schedule_change_log_append_only") }
+            c.prepareStatement("DELETE FROM app.schedule_change_log WHERE organization_id IN (?, ?)").use { st ->
+                st.setObject(1, orgA); st.setObject(2, orgB); st.executeUpdate()
+            }
+            c.createStatement().use { it.execute("ALTER TABLE app.schedule_change_log ENABLE TRIGGER schedule_change_log_append_only") }
             // deferred FK checks must fire before the table can be altered again in this transaction
             c.createStatement().use { it.execute("SET CONSTRAINTS ALL IMMEDIATE") }
             c.createStatement().use { it.execute("ALTER TABLE app.attendance_events ENABLE TRIGGER attendance_events_append_only") }
+            // messages.sender_membership_id has no cascade: remove conversations (cascading to participants/messages) first
+            c.prepareStatement("DELETE FROM app.conversations WHERE organization_id IN (?, ?)").use { st ->
+                st.setObject(1, orgA); st.setObject(2, orgB); st.executeUpdate()
+            }
             // announcement_audiences -> groups/locations has no cascade; drop the audience rules first
             c.prepareStatement("DELETE FROM app.announcement_audiences WHERE organization_id IN (?, ?)").use { st ->
                 st.setObject(1, orgA); st.setObject(2, orgB); st.executeUpdate()
@@ -115,12 +125,14 @@ class TestTenants(private val config: AppConfig) {
         ).use { st -> st.setObject(1, id); st.setString(2, email); st.setString(3, name); st.executeUpdate() }
     }
 
-    private fun insertSessionWithToken(c: Connection, userId: UUID): String {
+    /** [mfaVerified]: OWNER sessions need MFA for tenant routes (E02-B12), so the fixture owner's session is verified. */
+    private fun insertSessionWithToken(c: Connection, userId: UUID, mfaVerified: Boolean = false): String {
         val sessionId = UUID.randomUUID()
         val token = Tokens.generate(Tokens.Kind.ACCESS)
         c.prepareStatement(
-            "INSERT INTO app.sessions (id, user_id, client_kind, absolute_expires_at) VALUES (?, ?, 'WEB', now() + interval '1 day')",
-        ).use { st -> st.setObject(1, sessionId); st.setObject(2, userId); st.executeUpdate() }
+            "INSERT INTO app.sessions (id, user_id, client_kind, absolute_expires_at, mfa_verified_at) " +
+                "VALUES (?, ?, 'WEB', now() + interval '1 day', CASE WHEN ? THEN now() END)",
+        ).use { st -> st.setObject(1, sessionId); st.setObject(2, userId); st.setBoolean(3, mfaVerified); st.executeUpdate() }
         c.prepareStatement(
             "INSERT INTO app.access_tokens (session_id, token_hash, expires_at) VALUES (?, ?, now() + interval '10 minutes')",
         ).use { st -> st.setObject(1, sessionId); st.setBytes(2, Tokens.sha256(token)); st.executeUpdate() }

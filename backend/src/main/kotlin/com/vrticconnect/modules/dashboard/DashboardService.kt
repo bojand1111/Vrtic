@@ -6,8 +6,9 @@ import com.vrticconnect.authz.Scopes
 import com.vrticconnect.db.instantOrNull
 import com.vrticconnect.db.queryList
 import com.vrticconnect.db.queryOne
-import com.vrticconnect.db.timeOrNull
 import com.vrticconnect.db.uuid
+import com.vrticconnect.modules.schedules.ScheduleChanges
+import com.vrticconnect.modules.schedules.ScheduleResolver
 import com.vrticconnect.modules.tenant.TenantApi
 import com.vrticconnect.modules.tenant.TenantPrincipal
 import kotlinx.serialization.Serializable
@@ -66,11 +67,12 @@ data class DashboardSummary(
 
 /**
  * E16 (P0 part): admin dashboard. Per child enrolled on the date:
- *   expected   = active weekly template says `attends` for that weekday, or (no template) the weekday is a working day
+ *   expected   = not a closure day (organization or the group's location), then the day override, else the weekly
+ *                template for that weekday, else (no template) the weekday is a working day (ScheduleResolver.attendancePlan)
  *   status     = attendance_days.status for (child, date), NOT_ARRIVED when no row exists
  *   absent     = expected, an ACTIVE absence covers the date and the child is not checked in / out
  *   late       = today only: expected, NOT_ARRIVED, no absence and now > expected arrival + grace
- * Schedule overrides and closure days are not modelled yet (V5 has no such tables), so they do not affect `expected`.
+ *   lateScheduleChangesToday = schedule_change_log rows flagged late whose change starts on the date
  */
 class DashboardService(private val api: TenantApi) {
 
@@ -135,7 +137,7 @@ class DashboardService(private val api: TenantApi) {
                 guardiansPending = count(c, "SELECT count(*) AS n FROM app.guardians WHERE status = 'PENDING'"),
                 invitationsPending = count(c, "SELECT count(*) AS n FROM app.invitations WHERE accepted_at IS NULL AND revoked_at IS NULL AND expires_at > now()"),
                 absencesToday = count(c, "SELECT count(*) AS n FROM app.absences WHERE status = 'ACTIVE' AND date_from <= ? AND date_to >= ?", date, date),
-                lateScheduleChangesToday = 0,
+                lateScheduleChangesToday = ScheduleChanges.lateCount(c, date),
                 locations = locations.map { (id, name) ->
                     DashboardLocation(id.toString(), name, groups.count { it.second == id }, counters(rows.filter { it.locationId == id }))
                 },
@@ -162,35 +164,29 @@ class DashboardService(private val api: TenantApi) {
         }
     }
 
-    private fun childDays(c: Connection, date: LocalDate): List<ChildDay> = c.queryList(
-        """
-        SELECT e.group_id, g.location_id,
-               td.attends AS template_attends, td.arrival_time,
-               (t.id IS NOT NULL) AS has_template,
-               (EXTRACT(ISODOW FROM ?::date)::int = ANY (s.working_weekdays)) AS working_day,
-               COALESCE(ad.status, 'NOT_ARRIVED') AS status,
-               EXISTS (SELECT 1 FROM app.absences a WHERE a.child_id = e.child_id AND a.status = 'ACTIVE' AND a.date_from <= ? AND a.date_to >= ?) AS has_absence
-        FROM app.enrollments e
-        JOIN app.children ch ON ch.id = e.child_id AND ch.deleted_at IS NULL AND ch.status = 'ACTIVE'
-        JOIN app.groups g ON g.id = e.group_id
-        JOIN app.organization_settings s ON s.organization_id = e.organization_id
-        LEFT JOIN app.schedule_templates t ON t.child_id = e.child_id AND t.effective_from <= ? AND (t.effective_to IS NULL OR t.effective_to >= ?)
-        LEFT JOIN app.schedule_template_days td ON td.template_id = t.id AND td.weekday = EXTRACT(ISODOW FROM ?::date)::int
-        LEFT JOIN app.attendance_days ad ON ad.child_id = e.child_id AND ad.attendance_date = ?
-        WHERE e.status IN ('PLANNED','ACTIVE') AND e.valid_from <= ? AND (e.valid_to IS NULL OR e.valid_to >= ?)
-        """.trimIndent(),
-        date, date, date, date, date, date, date, date, date,
-    ) { rs ->
-        val hasTemplate = rs.getBoolean("has_template")
-        val templateAttends = rs.getBoolean("template_attends").takeUnless { rs.wasNull() }
-        ChildDay(
-            groupId = rs.uuid("group_id"),
-            locationId = rs.uuid("location_id"),
-            expected = if (hasTemplate) templateAttends == true else rs.getBoolean("working_day"),
-            status = rs.getString("status"),
-            hasAbsence = rs.getBoolean("has_absence"),
-            expectedArrival = rs.timeOrNull("arrival_time"),
-        )
+    private fun childDays(c: Connection, date: LocalDate): List<ChildDay> {
+        data class Row(val childId: UUID, val groupId: UUID, val locationId: UUID, val status: String, val hasAbsence: Boolean)
+        val rows = c.queryList(
+            """
+            SELECT e.child_id, e.group_id, g.location_id,
+                   COALESCE(ad.status, 'NOT_ARRIVED') AS status,
+                   EXISTS (SELECT 1 FROM app.absences a WHERE a.child_id = e.child_id AND a.status = 'ACTIVE' AND a.date_from <= ? AND a.date_to >= ?) AS has_absence
+            FROM app.enrollments e
+            JOIN app.children ch ON ch.id = e.child_id AND ch.deleted_at IS NULL AND ch.status = 'ACTIVE'
+            JOIN app.groups g ON g.id = e.group_id
+            LEFT JOIN app.attendance_days ad ON ad.child_id = e.child_id AND ad.attendance_date = ?
+            WHERE e.status IN ('PLANNED','ACTIVE') AND e.valid_from <= ? AND (e.valid_to IS NULL OR e.valid_to >= ?)
+            """.trimIndent(),
+            date, date, date, date, date,
+        ) { rs -> Row(rs.uuid("child_id"), rs.uuid("group_id"), rs.uuid("location_id"), rs.getString("status"), rs.getBoolean("has_absence")) }
+        val snapshot = ScheduleResolver.load(c, rows.map { it.childId }, date, date)
+        return rows.map { r ->
+            val plan = snapshot.attendancePlan(r.childId, date)
+            ChildDay(
+                groupId = r.groupId, locationId = r.locationId, expected = plan.isExpected, status = r.status,
+                hasAbsence = r.hasAbsence, expectedArrival = plan.arrival,
+            )
+        }
     }
 
     private fun count(c: Connection, sql: String, vararg params: Any?): Int =

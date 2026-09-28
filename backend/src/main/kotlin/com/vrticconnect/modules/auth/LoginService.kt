@@ -53,6 +53,11 @@ data class AuthResult(
     val tokens: TokenPair? = null,
     val csrfToken: String? = null,
     val mfaChallengeToken: String? = null,
+    /**
+     * E02-B12 (extension of the contract): true when MFA is mandatory for this account (OWNER membership or
+     * platform admin) and no method is enrolled yet; the session is limited to /auth and /me until enrollment.
+     */
+    val mfaEnrollmentRequired: Boolean? = null,
 )
 
 /** First usable login slice: password verification and bearer token/session issuance. */
@@ -283,9 +288,12 @@ class LoginService(
         insertSession(connection, sessionId, userId, clientKind, device, absoluteExpires, csrfToken)
         insertAccessToken(connection, sessionId, accessToken, now, accessExpires)
         insertRefreshToken(connection, sessionId, refreshToken, now, refreshExpires)
+        val mfa = mfaState(connection, userId)
 
         return AuthResult(
-            status = "AUTHENTICATED",
+            // E02-B12: an enrolled account gets a limited session that must pass POST /auth/mfa/totp/verify.
+            status = if (mfa.enabled) "MFA_REQUIRED" else "AUTHENTICATED",
+            mfaEnrollmentRequired = mfa.policyRequired && !mfa.enabled,
             sessionId = sessionId.toString(),
             tokens = TokenPair(
                 accessToken = accessToken,
@@ -308,6 +316,21 @@ class LoginService(
             call.respond(status, result)
         }
     }
+
+    private data class MfaState(val enabled: Boolean, val policyRequired: Boolean)
+
+    private fun mfaState(connection: Connection, userId: UUID): MfaState =
+        connection.prepareStatement(
+            "SELECT EXISTS (SELECT 1 FROM app.user_mfa_methods m WHERE m.user_id = ? AND m.verified_at IS NOT NULL AND m.revoked_at IS NULL) AS enabled, " +
+                "EXISTS (SELECT 1 FROM app.platform_admins pa WHERE pa.user_id = ? AND pa.revoked_at IS NULL) OR " +
+                "EXISTS (SELECT 1 FROM app.organization_memberships om JOIN app.organizations o ON o.id = om.organization_id " +
+                "WHERE om.user_id = ? AND om.role = 'OWNER' AND om.status = 'ACTIVE' AND o.deleted_at IS NULL) AS policy",
+        ).use { statement ->
+            statement.setObject(1, userId)
+            statement.setObject(2, userId)
+            statement.setObject(3, userId)
+            statement.executeQuery().use { rs -> rs.next(); MfaState(rs.getBoolean("enabled"), rs.getBoolean("policy")) }
+        }
 
     private fun findUser(connection: Connection, email: String): LoginUser? =
         connection.prepareStatement(

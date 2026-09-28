@@ -15,6 +15,7 @@ import com.vrticconnect.http.ProblemException
 import com.vrticconnect.http.Validation
 import com.vrticconnect.http.conflict
 import com.vrticconnect.http.invalidQuery
+import com.vrticconnect.modules.notifications.NotificationWriter
 import com.vrticconnect.modules.tenant.TenantApi
 import com.vrticconnect.modules.tenant.TenantPrincipal
 import com.vrticconnect.modules.tenant.audit
@@ -165,7 +166,7 @@ class AnnouncementService(private val api: TenantApi) {
                 id,
             )
             val count = AnnouncementAudiences.snapshot(c, p.membership.organizationId, id, author, audiences, today)
-            // Notification fan-out is done by the outbox relay (not part of this round); the event is recorded here.
+            // Push fan-out is left to the outbox relay (not built yet); the event is recorded here. The in-app inbox rows are written below.
             val payload = buildJsonObject {
                 put("announcementId", JsonPrimitive(id.toString()))
                 put("recipientsCount", JsonPrimitive(count))
@@ -176,6 +177,17 @@ class AnnouncementService(private val api: TenantApi) {
                 p.membership.organizationId, id, payload.toString(),
             )
             p.audit(c, "ANNOUNCEMENT_PUBLISHED", "ANNOUNCEMENT", id, requestId)
+            // In-app inbox rows for every snapshot recipient except the author, visible from the publish time.
+            val (title, publishedAt) = c.queryOne("SELECT title, published_at FROM app.announcements WHERE id = ?", id) {
+                it.getString("title") to it.instant("published_at")
+            }!!
+            val recipients = c.queryList("SELECT membership_id FROM app.announcement_recipients WHERE announcement_id = ? AND membership_id <> ?", id, author) {
+                it.uuid("membership_id")
+            }
+            NotificationWriter.notifyMemberships(
+                c, p.membership.organizationId, recipients, "ANNOUNCEMENT", "announcement.published", mapOf("title" to title),
+                "ANNOUNCEMENT", id, "announcement:$id", p.user.userId, visibleFrom = publishedAt,
+            )
             load(c, p, id, true)
         }
     }

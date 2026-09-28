@@ -3,6 +3,8 @@ package com.vrticconnect.modules.auth
 import com.vrticconnect.http.PageRequest
 import com.vrticconnect.http.ProblemException
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.plugins.callid.callId
+import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
@@ -25,6 +27,7 @@ fun Route.authRoutes(
     devMode: Boolean = false,
     accountService: AccountService? = null,
     reauthService: ReauthService? = null,
+    mfaService: MfaService? = null,
 ) {
     route("/auth") {
         // DB-backed deployments return the minimal SPA bootstrap payload; DB-free route tests keep the stub.
@@ -86,11 +89,32 @@ fun Route.authRoutes(
             csrfService?.require(call, authenticated)
             service.reauthenticate(call, authenticated)
         }
+        // E02-B11: TOTP enrollment and per-session verification (MfaService, MfaGate).
         route("/mfa") {
-            post("/totp/setup") { throw ProblemException.notImplemented("MFA setup") }
-            post("/totp/confirm") { throw ProblemException.notImplemented("MFA confirmation") }
-            post("/totp/verify") { throw ProblemException.notImplemented("MFA verification") }
-            post("/recovery-codes/regenerate") { throw ProblemException.notImplemented("MFA recovery codes") }
+            post("/totp/setup") {
+                val authenticated = requireUser(sessionResolver)
+                val service = mfaService ?: throw ProblemException.notImplemented("MFA setup")
+                csrfService?.require(call, authenticated)
+                call.respond(service.setup(authenticated, call.callId))
+            }
+            post("/totp/confirm") {
+                val authenticated = requireUser(sessionResolver)
+                val service = mfaService ?: throw ProblemException.notImplemented("MFA confirmation")
+                csrfService?.require(call, authenticated)
+                call.respond(service.confirm(authenticated, call.receive<TotpCodeRequest>(), call.callId))
+            }
+            post("/totp/verify") {
+                val authenticated = requireUser(sessionResolver)
+                val service = mfaService ?: throw ProblemException.notImplemented("MFA verification")
+                csrfService?.require(call, authenticated)
+                call.respond(service.verify(authenticated, call.receive<TotpVerifyRequest>(), call.callId))
+            }
+            post("/recovery-codes/regenerate") {
+                val authenticated = requireUser(sessionResolver)
+                val service = mfaService ?: throw ProblemException.notImplemented("MFA recovery codes")
+                csrfService?.require(call, authenticated)
+                call.respond(service.regenerateRecoveryCodes(authenticated, call.callId))
+            }
         }
     }
 }

@@ -45,7 +45,7 @@ object RecentAuthentication {
 }
 
 /**
- * `POST /auth/reauthenticate`: re-enter the password (and, once E02-B11 lands, the TOTP code when
+ * `POST /auth/reauthenticate`: re-enter the password (plus, optionally, the TOTP code when
  * enrolled) to stamp `sessions.reauthenticated_at`. Wrong password answers 403 and is rate-limited
  * per user; nothing is stamped on failure.
  */
@@ -53,6 +53,7 @@ class ReauthService(
     private val database: Database,
     private val passwordHasher: PasswordHasher,
     private val rateLimiter: RateLimiter = RateLimiter(),
+    private val mfaService: MfaService? = null,
 ) {
     suspend fun reauthenticate(call: ApplicationCall, user: AuthenticatedUser) {
         rateLimiter.require("reauth:${user.userId}", ATTEMPTS, AuthRateLimits.FAILED_LOGIN_WINDOW)
@@ -71,9 +72,11 @@ class ReauthService(
                     Audit.record(c, "REAUTHENTICATION_REJECTED", "SESSION", user.sessionId, actorUserId = user.userId, requestId = call.callId, result = Audit.Result.DENIED)
                     throw ProblemException(status = HttpStatusCode.Forbidden, type = ProblemTypes.FORBIDDEN, title = "Re-authentication failed", detail = "INVALID_CREDENTIALS")
                 }
-                if (mfaEnrolled) {
-                    // TOTP verification arrives with E02-B11; until then an enrolled user cannot exist (no enrollment endpoint).
-                    throw ProblemException.notImplemented("TOTP re-authentication")
+                // E02-B11: a supplied TOTP code must be valid. An enrolled user may re-enter only the password,
+                // because MfaGate lets a session reach this endpoint only after it has passed MFA.
+                val totp = request.totpCode?.trim()?.takeIf { it.isNotEmpty() }
+                if (totp != null && (!mfaEnrolled || mfaService?.checkTotp(c, user.userId, totp) != true)) {
+                    throw ProblemException(status = HttpStatusCode.Forbidden, type = ProblemTypes.FORBIDDEN, title = "Re-authentication failed", detail = "INVALID_CREDENTIALS")
                 }
                 val now = Instant.now()
                 c.prepareStatement("UPDATE app.sessions SET reauthenticated_at = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL").use { st ->

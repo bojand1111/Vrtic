@@ -48,7 +48,10 @@ class SchedulesIntegrationTest {
 
     @AfterAll
     fun tearDown() {
-        if (enabled) tenants.destroy()
+        if (enabled) {
+            ScheduleTestCleanup.removeChangeLog(config, tenants.orgA, tenants.orgB)
+            tenants.destroy()
+        }
     }
 
     private fun ApplicationTestBuilder.startApp() {
