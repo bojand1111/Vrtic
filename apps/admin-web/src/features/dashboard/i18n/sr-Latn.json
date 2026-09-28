@@ -28,5 +28,6 @@
   "openChild": "Detalji",
   "reportAbsence": "Prijavi odsustvo",
   "noMenu": "Jelovnik za danas nije objavljen.",
-  "unread": "nepročitano"
+  "unread": "nepročitano",
+  "lateScheduleChanges": "Kasne izmene rasporeda"
 }

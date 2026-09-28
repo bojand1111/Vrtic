@@ -11,6 +11,7 @@ import { TextField } from '../../components/TextField';
 import { getCurrentLocale } from '../../i18n/locale';
 import { acceptInvitation, type InvitationPreview, passwordProblem, previewInvitation, register } from './accountApi';
 import { AuthCard } from './AuthCard';
+import { mfaStepAfterSignIn } from './mfaApi';
 
 /**
  * `/invite?token=...` from the invitation e-mail. New e-mail: registration form (the token proves
@@ -68,6 +69,11 @@ function RegisterForm({ token }: { readonly token: string }) {
     mutationFn: () =>
       register({ invitationToken: token, password, givenName: givenName.trim(), familyName: familyName.trim(), preferredLocale: getCurrentLocale() }),
     onSuccess: async () => {
+      // A new OWNER must enroll MFA before anything else (E02-B12).
+      if ((await mfaStepAfterSignIn()) !== null) {
+        await navigate('/mfa', { replace: true });
+        return;
+      }
       await refresh();
       await navigate('/', { replace: true });
     },
@@ -110,6 +116,10 @@ function AcceptForExisting({ token }: { readonly token: string }) {
   const mutation = useMutation({
     mutationFn: () => acceptInvitation(token),
     onSuccess: async () => {
+      if ((await mfaStepAfterSignIn()) !== null) {
+        await navigate('/mfa', { replace: true });
+        return;
+      }
       await refresh();
       await navigate('/', { replace: true });
     },

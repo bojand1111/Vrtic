@@ -37,7 +37,9 @@
   "source": {
     "ABSENCE": "Absence",
     "TEMPLATE": "By schedule",
-    "NONE": "Not planned"
+    "NONE": "Not planned",
+    "CLOSURE": "Closure day",
+    "OVERRIDE": "Day change"
   },
   "notExpected": "not expected",
   "group": "Group",
@@ -55,5 +57,55 @@
   },
   "noLinkedChildren": "No children are linked to your account yet.",
   "child": "Child",
-  "readOnlyHint": "You can view this schedule but are not allowed to change it."
+  "readOnlyHint": "You can view this schedule but are not allowed to change it.",
+  "tabs": {
+    "expected": "Expected today",
+    "changes": "Changes",
+    "closures": "Closure days",
+    "children": "Child schedule"
+  },
+  "sourceColumn": "Source",
+  "plan": "Plan",
+  "lateChange": "Late change",
+  "frozen": "locked",
+  "override": {
+    "change": "Change day",
+    "reset": "Reset to template",
+    "confirmReset": "Remove the change for this day? The weekly schedule will apply.",
+    "title": "Change for {{date}}",
+    "lateTitle": "Late change",
+    "lateWarning": "The deadline for changing this day has passed ({{deadline}}, {{hours}} h before opening). The change will be saved and the kindergarten will see it as late.",
+    "lateWarningManager": "The deadline for changing this day has passed ({{deadline}}, {{hours}} h before opening). The change will be saved and flagged as late.",
+    "deadlineHint": "Changes after {{deadline}} are flagged as late.",
+    "deadlineRule": "Change deadline: {{hours}} h before the kindergarten opens that day. Later changes are accepted but flagged as late.",
+    "templateSays": "Weekly schedule: {{arrival}} to {{departure}}.",
+    "templateNone": "By the weekly schedule the child does not attend on this day.",
+    "reason": "Note (optional)"
+  },
+  "changes": {
+    "hint": "Schedule changes that start on the selected day. Late changes were made after the deadline.",
+    "lateOnly": "Late changes only",
+    "empty": "No schedule changes for the selected day.",
+    "kind": "Change",
+    "before": "Before",
+    "after": "After",
+    "by": "Changed by",
+    "when": "Recorded at",
+    "backToTemplate": "weekly schedule",
+    "kinds": {
+      "TEMPLATE_REPLACED": "New weekly schedule",
+      "OVERRIDE_SET": "Day change",
+      "OVERRIDE_REMOVED": "Day change removed",
+      "WEEK_UPDATED": "Week change"
+    }
+  },
+  "closures": {
+    "hint": "Children are not expected on closure days. A closure day applies to the whole kindergarten or to one location.",
+    "showPast": "Show past days too",
+    "add": "Add closure day",
+    "empty": "No closure days yet.",
+    "scope": "Applies to",
+    "wholeOrganization": "Whole kindergarten",
+    "namePlaceholder": "e.g. Statehood Day"
+  }
 }

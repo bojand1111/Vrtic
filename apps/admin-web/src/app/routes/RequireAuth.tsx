@@ -35,5 +35,10 @@ export function RequireAuth({ children }: RequireAuthProps) {
     return <Navigate to={LOGIN_PATH} replace state={loginState} />;
   }
 
+  // A session that still has to verify or enroll MFA only works on /mfa (a reload must not land on 403 pages).
+  if (state.mfaPending === true) {
+    return <Navigate to="/mfa" replace />;
+  }
+
   return children;
 }

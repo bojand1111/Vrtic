@@ -1,0 +1,86 @@
+.vc-bell {
+  position: relative;
+}
+
+.vc-bell-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vc-bell-badge {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--vc-danger);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+
+.vc-bell-panel {
+  position: absolute;
+  right: 0;
+  z-index: 20;
+  width: min(380px, calc(100vw - 32px));
+  max-height: 70vh;
+  overflow-y: auto;
+  margin-top: 6px;
+  padding: 12px;
+  border: 1px solid var(--vc-border);
+  border-radius: var(--vc-radius);
+  background: var(--vc-surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+}
+
+.vc-bell-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.vc-notification-list {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.vc-notification {
+  border-bottom: 1px solid var(--vc-border);
+}
+
+.vc-notification:last-child {
+  border-bottom: 0;
+}
+
+.vc-notification-button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vc-notification-button:hover {
+  background: var(--vc-bg);
+}
+
+.vc-notification--unread .vc-notification-title {
+  font-weight: 700;
+}
+
+.vc-notification-meta {
+  color: var(--vc-muted);
+  font-size: 0.85rem;
+}

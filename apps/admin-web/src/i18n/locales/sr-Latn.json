@@ -19,12 +19,14 @@
     "attendance": "Prisustvo",
     "schedules": "Rasporedi",
     "announcements": "Obaveštenja",
+    "messages": "Poruke",
     "calendar": "Kalendar",
     "meals": "Obroci",
     "photos": "Fotografije",
     "reports": "Izveštaji",
     "settings": "Podešavanja",
-    "billing": "Naplata"
+    "billing": "Naplata",
+    "account": "Moj nalog"
   },
   "common": {
     "emptyState": "Još nema podataka",
@@ -89,6 +91,37 @@
       "invalid": "Link za promenu lozinke nije ispravan, istekao je ili je već iskorišćen.",
       "done": "Lozinka je promenjena. Svi uređaji su odjavljeni; prijavite se novom lozinkom.",
       "submit": "Sačuvaj lozinku"
+    },
+    "mfa": {
+      "title": "Potvrda u dva koraka",
+      "verifyIntro": "Unesite šestocifreni kod iz aplikacije za autentifikaciju ili jedan od kodova za oporavak.",
+      "code": "Kod",
+      "verify": "Potvrdi",
+      "verifying": "Proveravam…",
+      "invalidCode": "Kod nije ispravan ili je istekao. Unesite kod koji aplikacija sada prikazuje.",
+      "enrollIntro": "Vaša uloga zahteva potvrdu u dva koraka. Podesite je sada, nakon toga možete da nastavite u aplikaciju.",
+      "appHint": "Potrebna vam je aplikacija za autentifikaciju na telefonu, na primer Google Authenticator ili Microsoft Authenticator.",
+      "start": "Podesi potvrdu u dva koraka",
+      "scan": "Skenirajte ovaj QR kod aplikacijom za autentifikaciju.",
+      "manual": "Ne možete da skenirate? Dodajte nalog ručno pomoću ovog ključa (vremenski zasnovan, 6 cifara, 30 sekundi):",
+      "copy": "Kopiraj",
+      "copied": "Kopirano.",
+      "copyFailed": "Kopiranje nije dostupno; označite tekst i kopirajte ga ručno.",
+      "uriLabel": "Link za podešavanje (otpauth)",
+      "confirmIntro": "Unesite šestocifreni kod iz aplikacije da završite podešavanje (pre {{time}}).",
+      "confirm": "Završi podešavanje",
+      "recoveryTitle": "Kodovi za oporavak",
+      "recoveryIntro": "Sačuvajte ove kodove na bezbednom mestu. Ako izgubite telefon, svaki kod možete jednom upotrebiti umesto koda iz aplikacije. Prikazuju se samo sada.",
+      "copyCodes": "Kopiraj kodove",
+      "continue": "Nastavi",
+      "reauthTitle": "Potvrdite lozinku",
+      "reauthIntro": "Radi vaše bezbednosti, ponovo unesite lozinku.",
+      "reauthSubmit": "Potvrdi",
+      "logout": "Odjavi se",
+      "enabled": "Potvrda u dva koraka je uključena.",
+      "qrAlt": "QR kod za aplikaciju za autentifikaciju",
+      "keyNotCode": "Ovo je ključ za podešavanje, a ne kod. Unesite ga u aplikaciju na telefonu (ili skenirajte QR kod), pa ovde upišite šestocifreni kod koji aplikacija prikaže.",
+      "sixDigits": "Kod ima tačno 6 cifara iz aplikacije na telefonu."
     }
   },
   "errors": {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { addDays, eventsByDay, monthRange, shiftMonth } from './month';
+import { addDays, eventsByDay, monthRange, shiftMonth, withClosures } from './month';
 
 describe('calendar month helpers', () => {
   it('computes month ranges including leap February', () => {
@@ -24,5 +24,14 @@ describe('calendar month helpers', () => {
     const days = eventsByDay(events, '2026-09-01', '2026-09-30');
     expect(days.map((d) => d.day)).toEqual(['2026-09-01', '2026-09-02']);
     expect(days[1]?.events.map((e) => e.id)).toEqual(['a', 'b']);
+  });
+
+  it('joins closure days with event days in date order', () => {
+    const days = eventsByDay([{ startsOn: '2026-09-10', endsOn: '2026-09-10' }], '2026-09-01', '2026-09-30');
+    const joined = withClosures(days, [{ closureDate: '2026-09-10' }, { closureDate: '2026-09-02' }]);
+    expect(joined.map((d) => [d.day, d.events.length, d.closures.length])).toEqual([
+      ['2026-09-02', 0, 1],
+      ['2026-09-10', 1, 1],
+    ]);
   });
 });

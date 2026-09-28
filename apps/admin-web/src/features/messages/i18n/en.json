@@ -1,0 +1,36 @@
+{
+  "newConversation": "New message",
+  "conversations": "Conversations",
+  "empty": "No conversations yet.",
+  "emptyHint": "Start a conversation about a child with the group's teachers or with the kindergarten administration.",
+  "selectConversation": "Select a conversation from the list.",
+  "child": "Child",
+  "selectChild": "Select a child",
+  "kind": "Send to",
+  "kinds": {
+    "PARENT_TEACHER": "Group teachers",
+    "PARENT_ADMIN": "Administration"
+  },
+  "subject": "Subject (optional)",
+  "firstMessage": "Message",
+  "start": "Send",
+  "send": "Send",
+  "sending": "Sending…",
+  "composerLabel": "New message",
+  "composerHint": "Enter sends, Shift+Enter adds a new line.",
+  "length": "{{count}} / 4000",
+  "back": "Back to conversations",
+  "unread": "{{count}} unread",
+  "participants": "Participants",
+  "formerParticipant": "no longer a participant",
+  "noMessages": "No messages.",
+  "deleted": "Message deleted.",
+  "you": "You",
+  "closed": "This conversation is closed.",
+  "participantsHint": "Participants are set by the kindergarten: the child's confirmed parents and the group teachers, or the administration.",
+  "roles": {
+    "GUARDIAN": "parent",
+    "TEACHER": "teacher",
+    "ADMIN": "administration"
+  }
+}

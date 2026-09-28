@@ -1,9 +1,9 @@
 import { useMutation } from '@tanstack/react-query';
 import { type SubmitEvent, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, Navigate, useLocation } from 'react-router';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router';
 
-import { login, type LoginRequest } from '../../api/auth';
+import type { LoginRequest } from '../../api/auth';
 import { ApiProblem, NetworkError } from '../../api/problem';
 import { HealthWidget } from '../../app/layout/HealthWidget';
 import { LocaleSwitcher } from '../../app/layout/LocaleSwitcher';
@@ -12,6 +12,7 @@ import { useDocumentTitle } from '../../app/useDocumentTitle';
 import { useSession } from '../../auth/useSession';
 import { Alert } from '../../components/Alert';
 import { TextField } from '../../components/TextField';
+import { loginWeb } from './mfaApi';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -41,6 +42,7 @@ export function LoginPage() {
   const { t } = useTranslation();
   const { state: session, refresh } = useSession();
   const location = useLocation();
+  const navigate = useNavigate();
   const title = t('auth.loginTitle');
   useDocumentTitle(title);
 
@@ -50,15 +52,21 @@ export function LoginPage() {
   const emailRef = useRef<HTMLInputElement | null>(null);
   const passwordRef = useRef<HTMLInputElement | null>(null);
 
+  const locationState = readLocationState(location.state);
+
   const mutation = useMutation({
-    mutationFn: (request: LoginRequest) => login(request),
-    onSuccess: async () => {
+    mutationFn: (request: LoginRequest) => loginWeb(request.email, request.password),
+    onSuccess: async (result) => {
+      // E02-B12: a session that still owes MFA (verification or mandatory enrollment) goes to /mfa first;
+      // the session view is refreshed there once MFA is done.
+      if (result.status === 'MFA_REQUIRED' || result.mfaEnrollmentRequired === true) {
+        await navigate('/mfa', { replace: true, state: { from: locationState.from } });
+        return;
+      }
       // Cookies were set by the backend; we only re-read who we are. Nothing is stored locally.
       await refresh();
     },
   });
-
-  const locationState = readLocationState(location.state);
 
   if (session.status === 'authenticated') {
     const target = locationState.from !== undefined && locationState.from !== '/login' ? locationState.from : '/';

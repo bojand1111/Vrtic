@@ -1,0 +1,24 @@
+{
+  "bell": "Notifications",
+  "bellUnread": "Notifications, unread: {{count}}",
+  "latest": "Latest",
+  "empty": "No notifications.",
+  "all": "All notifications",
+  "markAllRead": "Mark all as read",
+  "unreadOnly": "Unread only",
+  "unread": "unread",
+  "generic": "New notification",
+  "announcement": {
+    "published": "New announcement: {{title}}"
+  },
+  "absence": {
+    "reported": "Absence reported: {{childName}} ({{dateFrom}} – {{dateTo}})",
+    "cancelled": "Absence cancelled: {{childName}} ({{dateFrom}} – {{dateTo}})"
+  },
+  "guardian": {
+    "confirmed": "The kindergarten confirmed your link to the child: {{childName}}"
+  },
+  "message": {
+    "received": "New message from {{senderName}} (child: {{childName}})"
+  }
+}

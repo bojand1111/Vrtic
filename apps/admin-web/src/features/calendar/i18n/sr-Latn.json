@@ -30,5 +30,6 @@
   "previousMonth": "Prethodni mesec",
   "nextMonth": "Sledeći mesec",
   "today": "Danas",
-  "empty": "Nema događaja u ovom mesecu."
+  "empty": "Nema događaja u ovom mesecu.",
+  "closureDay": "Neradni dan"
 }

@@ -9,7 +9,8 @@ import { ProblemAlert } from '../../components/ProblemAlert';
 import { type NamedRef, type Page as ListPage, useVersionedMutation } from '../announcements/versionedMutation';
 import { CalendarEventForm } from './CalendarEventForm';
 import type { CalendarEvent } from './calendarTypes';
-import { eventsByDay, monthRange, shiftMonth } from './month';
+import type { ClosureDay } from '../schedules/types';
+import { eventsByDay, monthRange, shiftMonth, withClosures } from './month';
 import './calendar.css';
 
 export function CalendarPage() {
@@ -22,6 +23,7 @@ export function CalendarPage() {
   const events = useOrgQuery<ListPage<CalendarEvent>>(['calendar'], `/calendar-events?from=${from}&to=${to}&limit=100`, { enabled: can('CALENDAR_READ') });
   const groups = useOrgQuery<ListPage<NamedRef>>(['groups'], '/groups?limit=100', { enabled: isStaff });
   const locations = useOrgQuery<ListPage<NamedRef>>(['locations'], '/locations?limit=100', { enabled: can('CALENDAR_MANAGE') });
+  const closures = useOrgQuery<ListPage<ClosureDay>>(['closure-days'], `/closure-days?from=${from}&to=${to}&limit=100`, { enabled: can('SCHEDULE_READ') });
   const remove = useVersionedMutation(['calendar']);
   const [editing, setEditing] = useState<CalendarEvent | 'new' | null>(null);
   const canManage = can('CALENDAR_MANAGE');
@@ -46,7 +48,8 @@ export function CalendarPage() {
     }
   };
 
-  const days = events.data === undefined ? [] : eventsByDay(events.data.items, from, to);
+  // closure days (Schedules > Closure days) are shown read-only on their dates
+  const days = events.data === undefined ? [] : withClosures(eventsByDay(events.data.items, from, to), closures.data?.items ?? []);
 
   return (
     <Page
@@ -78,11 +81,21 @@ export function CalendarPage() {
           <ProblemAlert error={remove.error} />
           {events.isPending ? <Loading /> : null}
           {events.isError ? <ProblemAlert error={events.error} /> : null}
+          <ProblemAlert error={closures.error} />
           {events.data !== undefined && days.length === 0 ? <EmptyState message={t('calendar.empty')} /> : null}
-          {days.map(({ day, events: list }) => (
-            <section key={day} className="vc-section">
+          {days.map(({ day, events: list, closures: closed }) => (
+            <section key={day} className={closed.length > 0 ? 'vc-section vc-calendar-closed' : 'vc-section'}>
               <h2>{new Date(`${day}T00:00:00`).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
               <ul className="vc-list">
+                {closed.map((c) => (
+                  <li key={c.id}>
+                    <div className="vc-calendar-event">
+                      <Badge tone="danger">{t('calendar.closureDay')}</Badge>
+                      <strong>{c.name}</strong>
+                      <span className="vc-muted">{c.locationId == null ? t('calendar.wholeOrganization') : (c.locationName ?? t('calendar.scope.location'))}</span>
+                    </div>
+                  </li>
+                ))}
                 {list.map((e) => (
                   <li key={e.id}>
                     <div className="vc-calendar-event">

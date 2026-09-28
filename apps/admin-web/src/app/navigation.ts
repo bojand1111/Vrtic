@@ -10,6 +10,8 @@ interface FeatureEntry {
   readonly path: string;
   readonly anyOf?: readonly Permission[];
   readonly platform?: boolean;
+  /** Screen not built yet: route exists, not shown in the menu. */
+  readonly hidden?: boolean;
 }
 
 export const FEATURES = [
@@ -24,12 +26,14 @@ export const FEATURES = [
   { key: 'attendance', path: '/attendance', anyOf: ['ATTENDANCE_READ'] },
   { key: 'schedules', path: '/schedules', anyOf: ['SCHEDULE_READ'] },
   { key: 'announcements', path: '/announcements', anyOf: ['ANNOUNCEMENT_READ'] },
+  { key: 'messages', path: '/messages', anyOf: ['MESSAGE_SEND'] },
   { key: 'calendar', path: '/calendar', anyOf: ['CALENDAR_READ'] },
   { key: 'meals', path: '/meals', anyOf: ['MENU_READ'] },
-  { key: 'photos', path: '/photos', anyOf: ['REPORT_VIEW'] },
+  { key: 'photos', path: '/photos', anyOf: ['REPORT_VIEW'], hidden: true },
   { key: 'reports', path: '/reports', anyOf: ['REPORT_VIEW'] },
   { key: 'settings', path: '/settings', anyOf: ['LOCATION_MANAGE'] },
   { key: 'billing', path: '/billing', anyOf: ['BILLING_VIEW'] },
+  { key: 'account', path: '/account' },
 ] as const satisfies readonly FeatureEntry[];
 
 export type FeatureKey = (typeof FEATURES)[number]['key'];
@@ -39,6 +43,9 @@ export function isFeatureVisible(
   can: (permission: Permission) => boolean,
   isPlatformAdmin: boolean,
 ): boolean {
+  if (feature.hidden === true) {
+    return false;
+  }
   if (feature.platform === true) {
     return isPlatformAdmin;
   }

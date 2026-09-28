@@ -20,6 +20,8 @@ export interface DashboardSummary {
   readonly guardiansPending: number;
   readonly invitationsPending: number;
   readonly absencesToday: number;
+  /** Late schedule changes that start on the date (schedule_change_log). */
+  readonly lateScheduleChangesToday: number;
   readonly locations: readonly {
     readonly locationId: string;
     readonly name: string;

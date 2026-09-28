@@ -20,4 +20,4 @@ export interface SessionUser {
 export type SessionState =
   | { readonly status: 'loading' }
   | { readonly status: 'unauthenticated'; readonly reason?: 'expired' }
-  | { readonly status: 'authenticated'; readonly user: SessionUser };
+  | { readonly status: 'authenticated'; readonly user: SessionUser; readonly mfaPending?: boolean };

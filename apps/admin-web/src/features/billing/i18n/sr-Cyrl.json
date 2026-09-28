@@ -1,0 +1,52 @@
+{
+  "intro": "План и претплата вашег вртића.",
+  "none": "Ваш вртић нема активну претплату. Обратите се подршци Вртић Connect.",
+  "paymentsNote": "Плаћање на мрежи није део ове верзије; претплате се фактуришу ручно.",
+  "plan": "План",
+  "planVersion": "{{name}} ({{code}}, верзија {{version}})",
+  "price": "Месечна цена",
+  "status": "Статус",
+  "trialEndsAt": "Пробни период истиче",
+  "periodStart": "Текући период од",
+  "periodEnd": "Текући период до",
+  "cancelAtPeriodEnd": "Отказује се на крају периода",
+  "provider": "Фактурисање",
+  "limits": "Ограничења",
+  "noLimits": "За овај план нису постављена ограничења.",
+  "entitlements": "Укључено у план",
+  "flags": "Функције вашег вртића",
+  "flag": "Функција",
+  "enabled": "Укључено",
+  "source": "Одлучује",
+  "on": "Укључено",
+  "off": "Искључено",
+  "statuses": {
+    "TRIAL": "Пробни период",
+    "ACTIVE": "Активна",
+    "PAST_DUE": "Доспела, неплаћена",
+    "CANCELLED": "Отказана"
+  },
+  "providers": {
+    "MANUAL": "Ручна фактура",
+    "STRIPE": "Плаћање картицом",
+    "LOCAL_INVOICE": "Локална фактура"
+  },
+  "sources": {
+    "KILL_SWITCH": "Искључила платформа",
+    "TENANT_OVERRIDE": "Подешавање за овај вртић",
+    "PLAN_ENTITLEMENT": "План",
+    "DEFAULT": "Подразумевано"
+  },
+  "limitNames": {
+    "max_children": "Највећи број деце",
+    "max_locations": "Највећи број објеката",
+    "max_staff": "Највећи број запослених"
+  },
+  "flagNames": {
+    "photos_enabled": "Галерија фотографија",
+    "messaging_enabled": "Поруке",
+    "meals_enabled": "Оброци",
+    "calendar_enabled": "Календар",
+    "payments_enabled": "Плаћања родитеља"
+  }
+}

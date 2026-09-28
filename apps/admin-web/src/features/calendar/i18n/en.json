@@ -30,5 +30,6 @@
   "previousMonth": "Previous month",
   "nextMonth": "Next month",
   "today": "Today",
-  "empty": "No events this month."
+  "empty": "No events this month.",
+  "closureDay": "Closure day"
 }

@@ -1,0 +1,36 @@
+{
+  "newConversation": "Нова порука",
+  "conversations": "Разговори",
+  "empty": "Још нема разговора.",
+  "emptyHint": "Започните разговор о детету са васпитачима групе или са управом вртића.",
+  "selectConversation": "Изаберите разговор са листе.",
+  "child": "Дете",
+  "selectChild": "Изаберите дете",
+  "kind": "Коме пишете",
+  "kinds": {
+    "PARENT_TEACHER": "Васпитачи групе",
+    "PARENT_ADMIN": "Управа вртића"
+  },
+  "subject": "Тема (није обавезно)",
+  "firstMessage": "Порука",
+  "start": "Пошаљи",
+  "send": "Пошаљи",
+  "sending": "Шаље се…",
+  "composerLabel": "Нова порука",
+  "composerHint": "Enter шаље, Shift+Enter прелази у нови ред.",
+  "length": "{{count}} / 4000",
+  "back": "Назад на разговоре",
+  "unread": "{{count}} непрочитано",
+  "participants": "Учесници",
+  "formerParticipant": "више није учесник",
+  "noMessages": "Нема порука.",
+  "deleted": "Порука је обрисана.",
+  "you": "Ви",
+  "closed": "Разговор је затворен.",
+  "participantsHint": "Учеснике одређује вртић: потврђени родитељи детета и васпитачи групе, односно управа.",
+  "roles": {
+    "GUARDIAN": "родитељ",
+    "TEACHER": "васпитач",
+    "ADMIN": "управа"
+  }
+}

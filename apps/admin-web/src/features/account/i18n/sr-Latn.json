@@ -1,0 +1,54 @@
+{
+  "profile": {
+    "title": "Profil",
+    "name": "Ime i prezime",
+    "email": "E-pošta",
+    "emailVerified": "potvrđena",
+    "emailNotVerified": "nije potvrđena",
+    "language": "Jezik za e-poštu i obaveštenja",
+    "saveLanguage": "Sačuvaj jezik",
+    "languageSaved": "Jezik je sačuvan.",
+    "lastLogin": "Poslednja prijava",
+    "createdAt": "Nalog napravljen",
+    "platformAdmin": "Administrator platforme",
+    "memberships": "Vrtići i uloge"
+  },
+  "password": {
+    "title": "Promena lozinke",
+    "current": "Trenutna lozinka",
+    "submit": "Promeni lozinku",
+    "done": "Lozinka je promenjena. Svi ostali uređaji su odjavljeni.",
+    "wrongCurrent": "Trenutna lozinka nije ispravna."
+  },
+  "mfa": {
+    "title": "Potvrda u dva koraka",
+    "intro": "Štiti vaš nalog kodom iz aplikacije za autentifikaciju na telefonu.",
+    "on": "Uključena",
+    "off": "Isključena",
+    "required": "Obavezna za vlasnike vrtića i administratore platforme.",
+    "enable": "Uključi",
+    "regenerate": "Napravi nove kodove za oporavak",
+    "regenerateIntro": "Stari neiskorišćeni kodovi za oporavak prestaju da važe. Možda ćete morati da unesete lozinku."
+  },
+  "sessions": {
+    "title": "Aktivne sesije",
+    "device": "Uređaj",
+    "client": "Aplikacija",
+    "createdAt": "Prijava",
+    "lastSeenAt": "Poslednja aktivnost",
+    "expiresAt": "Važi do",
+    "current": "Ovaj uređaj",
+    "mfaVerified": "Potvrđeno u dva koraka",
+    "revoke": "Odjavi uređaj",
+    "revokeConfirm": "Odjaviti ovaj uređaj?",
+    "logoutAll": "Odjavi se svuda",
+    "logoutAllConfirm": "Odjaviti se na svim uređajima, uključujući i ovaj?",
+    "empty": "Nema aktivnih sesija.",
+    "unknownDevice": "Nepoznat uređaj",
+    "clientKinds": {
+      "WEB": "Veb pregledač",
+      "ANDROID": "Android aplikacija",
+      "IOS": "iOS aplikacija"
+    }
+  }
+}

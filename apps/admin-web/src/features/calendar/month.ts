@@ -51,3 +51,27 @@ export function eventsByDay<T extends DatedEvent>(events: readonly T[], from: st
   }
   return [...days.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, list]) => ({ day, events: list }));
 }
+
+interface DatedClosure {
+  readonly closureDate: string;
+}
+
+/**
+ * Joins the event days with closure days (read-only, from /closure-days): every day that has events or a
+ * closure, ascending; closures keep their order.
+ */
+export function withClosures<E, C extends DatedClosure>(
+  days: readonly { readonly day: string; readonly events: readonly E[] }[],
+  closures: readonly C[],
+): { readonly day: string; readonly events: readonly E[]; readonly closures: readonly C[] }[] {
+  const map = new Map<string, { events: readonly E[]; closures: C[] }>();
+  for (const d of days) {
+    map.set(d.day, { events: d.events, closures: [] });
+  }
+  for (const c of closures) {
+    const entry = map.get(c.closureDate) ?? { events: [], closures: [] };
+    entry.closures.push(c);
+    map.set(c.closureDate, entry);
+  }
+  return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, v]) => ({ day, events: v.events, closures: v.closures }));
+}

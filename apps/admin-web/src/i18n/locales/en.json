@@ -19,12 +19,14 @@
     "attendance": "Attendance",
     "schedules": "Schedules",
     "announcements": "Announcements",
+    "messages": "Messages",
     "calendar": "Calendar",
     "meals": "Meals",
     "photos": "Photos",
     "reports": "Reports",
     "settings": "Settings",
-    "billing": "Billing"
+    "billing": "Billing",
+    "account": "My account"
   },
   "common": {
     "emptyState": "No data yet",
@@ -89,6 +91,37 @@
       "invalid": "The password reset link is invalid, expired or already used.",
       "done": "Your password was changed. All devices were signed out; sign in with the new password.",
       "submit": "Save password"
+    },
+    "mfa": {
+      "title": "Two-step verification",
+      "verifyIntro": "Enter the 6-digit code from your authenticator app, or one of your recovery codes.",
+      "code": "Code",
+      "verify": "Confirm",
+      "verifying": "Checking…",
+      "invalidCode": "The code is wrong or has expired. Enter the code the app shows now.",
+      "enrollIntro": "Your role requires two-step verification. Set it up now; after that you can continue to the application.",
+      "appHint": "You need an authenticator app on your phone, for example Google Authenticator or Microsoft Authenticator.",
+      "start": "Set up two-step verification",
+      "scan": "Scan this QR code with the authenticator app.",
+      "manual": "Cannot scan it? Add an account manually with this key (time based, 6 digits, 30 seconds):",
+      "copy": "Copy",
+      "copied": "Copied.",
+      "copyFailed": "Copying is not available; select the text and copy it manually.",
+      "uriLabel": "Setup link (otpauth)",
+      "confirmIntro": "Enter the 6-digit code the app shows to finish the setup (before {{time}}).",
+      "confirm": "Finish setup",
+      "recoveryTitle": "Recovery codes",
+      "recoveryIntro": "Store these codes in a safe place. If you lose your phone, each code can be used once instead of the app code. They are shown only now.",
+      "copyCodes": "Copy codes",
+      "continue": "Continue",
+      "reauthTitle": "Confirm your password",
+      "reauthIntro": "For your security, enter your password again.",
+      "reauthSubmit": "Confirm",
+      "logout": "Sign out",
+      "enabled": "Two-step verification is on.",
+      "qrAlt": "QR code for the authenticator app",
+      "keyNotCode": "This is the setup key, not the code. Enter it in the authenticator app on your phone (or scan the QR code), then type the 6-digit code the app shows.",
+      "sixDigits": "The code is exactly 6 digits from the app on your phone."
     }
   },
   "errors": {

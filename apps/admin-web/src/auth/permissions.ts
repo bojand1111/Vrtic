@@ -34,8 +34,10 @@ export type Permission =
   | 'MENU_READ'
   | 'MENU_MANAGE'
   | 'PHOTO_VIEW'
+  | 'MESSAGE_SEND'
   | 'BILLING_VIEW'
   | 'REPORT_VIEW'
+  | 'REPORT_EXPORT'
   | 'AUDIT_READ';
 
 const TEACHER: readonly Permission[] = [
@@ -49,6 +51,7 @@ const TEACHER: readonly Permission[] = [
   'CALENDAR_READ',
   'MENU_READ',
   'PHOTO_VIEW',
+  'MESSAGE_SEND',
 ];
 
 const PARENT: readonly Permission[] = [
@@ -64,6 +67,7 @@ const PARENT: readonly Permission[] = [
   'CALENDAR_READ',
   'MENU_READ',
   'PHOTO_VIEW',
+  'MESSAGE_SEND',
 ];
 
 const ADMIN: readonly Permission[] = [
@@ -88,7 +92,7 @@ const ADMIN: readonly Permission[] = [
   'AUDIT_READ',
 ];
 
-const OWNER: readonly Permission[] = [...ADMIN, 'ORG_SETTINGS_MANAGE', 'BILLING_VIEW'];
+const OWNER: readonly Permission[] = [...ADMIN, 'ORG_SETTINGS_MANAGE', 'BILLING_VIEW', 'REPORT_EXPORT'];
 
 const MATRIX: Readonly<Record<OrganizationRole, ReadonlySet<Permission>>> = {
   OWNER: new Set(OWNER),

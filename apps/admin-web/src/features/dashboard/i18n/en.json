@@ -28,5 +28,6 @@
   "openChild": "Details",
   "reportAbsence": "Report absence",
   "noMenu": "Today's menu has not been published.",
-  "unread": "unread"
+  "unread": "unread",
+  "lateScheduleChanges": "Late schedule changes"
 }

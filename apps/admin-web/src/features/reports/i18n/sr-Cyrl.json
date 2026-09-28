@@ -1,0 +1,59 @@
+{
+  "tabs": {
+    "attendance": "Присуство",
+    "audit": "Дневник активности"
+  },
+  "group": "Група",
+  "allGroups": "Све групе",
+  "child": "Дете",
+  "exportCsv": "Извези CSV",
+  "exporting": "Извоз...",
+  "invalidRange": "Изаберите период (датум од не сме бити после датума до).",
+  "nothingCounted": "Изабрани период је у будућности: још нема података о присуству.",
+  "countedRange": "Обухваћени дани: {{from}} до {{to}} (будући дани се не рачунају).",
+  "totals": "Укупно",
+  "totalsLabels": {
+    "workingDays": "Радних дана",
+    "expectedChildDays": "Очекивано (дете-дана)",
+    "presentChildDays": "Присутно",
+    "absentChildDays": "Одсутно",
+    "notArrivedChildDays": "Није дошло",
+    "unscheduledChildDays": "Непланирано присутно",
+    "lateArrivals": "Касни доласци",
+    "attendanceRatePct": "Присуство"
+  },
+  "percent": "{{value}} %",
+  "byGroup": "По групама",
+  "byChild": "По деци",
+  "empty": "Нема уписане деце у изабраном периоду.",
+  "columns": {
+    "expected": "Очекивано",
+    "present": "Присутно",
+    "absent": "Одсутно",
+    "notArrived": "Није дошло",
+    "unscheduled": "Непланирано",
+    "late": "Касни доласци",
+    "rate": "Присуство",
+    "sick": "Болест",
+    "vacation": "Одмор",
+    "otherAbsence": "Остало одсуство"
+  },
+  "audit": {
+    "action": "Радња",
+    "entityType": "Врста записа",
+    "entityId": "Запис",
+    "result": "Исход",
+    "results": {
+      "SUCCESS": "Успешно",
+      "DENIED": "Одбијено",
+      "FAILED": "Неуспешно"
+    },
+    "when": "Време",
+    "actor": "Корисник",
+    "details": "Детаљи",
+    "system": "систем",
+    "empty": "Нема записа за изабране филтере.",
+    "previous": "Претходна страна",
+    "next": "Следећа страна"
+  }
+}

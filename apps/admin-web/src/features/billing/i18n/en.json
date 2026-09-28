@@ -1,0 +1,52 @@
+{
+  "intro": "Plan and subscription of your kindergarten.",
+  "none": "Your kindergarten has no active subscription. Contact the Vrtić Connect support.",
+  "paymentsNote": "Online payment is not part of this version; subscriptions are invoiced manually.",
+  "plan": "Plan",
+  "planVersion": "{{name}} ({{code}}, version {{version}})",
+  "price": "Monthly price",
+  "status": "Status",
+  "trialEndsAt": "Trial ends",
+  "periodStart": "Current period from",
+  "periodEnd": "Current period to",
+  "cancelAtPeriodEnd": "Cancels at the end of the period",
+  "provider": "Invoicing",
+  "limits": "Limits",
+  "noLimits": "No limits are set for this plan.",
+  "entitlements": "Included in the plan",
+  "flags": "Features of your kindergarten",
+  "flag": "Feature",
+  "enabled": "Enabled",
+  "source": "Decided by",
+  "on": "On",
+  "off": "Off",
+  "statuses": {
+    "TRIAL": "Trial",
+    "ACTIVE": "Active",
+    "PAST_DUE": "Past due",
+    "CANCELLED": "Cancelled"
+  },
+  "providers": {
+    "MANUAL": "Manual invoice",
+    "STRIPE": "Card payment",
+    "LOCAL_INVOICE": "Local invoice"
+  },
+  "sources": {
+    "KILL_SWITCH": "Turned off by the platform",
+    "TENANT_OVERRIDE": "Setting for this kindergarten",
+    "PLAN_ENTITLEMENT": "Plan",
+    "DEFAULT": "Default"
+  },
+  "limitNames": {
+    "max_children": "Maximum number of children",
+    "max_locations": "Maximum number of locations",
+    "max_staff": "Maximum number of staff"
+  },
+  "flagNames": {
+    "photos_enabled": "Photo gallery",
+    "messaging_enabled": "Messages",
+    "meals_enabled": "Meals",
+    "calendar_enabled": "Calendar",
+    "payments_enabled": "Parent payments"
+  }
+}

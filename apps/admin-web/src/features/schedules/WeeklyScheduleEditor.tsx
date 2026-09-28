@@ -5,10 +5,11 @@ import { useOrgMutation, useOrgQuery } from '../../api/org';
 import { fieldError } from '../../api/problem';
 import { todayIso, useFormat } from '../../app/format';
 import { InputField } from '../../components/Form';
-import { Badge, Loading } from '../../components/Page';
+import { Loading } from '../../components/Page';
 import { ProblemAlert } from '../../components/ProblemAlert';
-import { addDays, mondayOf, type ScheduleRules, type TemplateDayDraft, validateTemplateDays } from '../children/helpers';
-import type { ScheduleTemplate, TemplateDay, WeekSchedule } from './types';
+import { type ScheduleRules, type TemplateDayDraft, validateTemplateDays } from '../children/helpers';
+import type { ScheduleTemplate, TemplateDay } from './types';
+import { WeekView } from './WeekView';
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7] as const;
 
@@ -18,7 +19,8 @@ function weekdayKey(w: number) {
 
 /**
  * Weekly schedule of one child: current template, upcoming/previous templates, the computed week
- * (template + absences) and, when allowed, an editor that replaces the template from a date.
+ * (closures, absences, day overrides, template) with one-day changes and, when allowed, an editor that
+ * replaces the template from a date.
  */
 export function WeeklyScheduleEditor({ childId, canEdit }: { readonly childId: string; readonly canEdit: boolean }) {
   const { t } = useTranslation();
@@ -236,69 +238,5 @@ function TemplateForm({ childId, rules, initial, onDone }: { readonly childId: s
         </button>
       </div>
     </form>
-  );
-}
-
-/** The computed week (template + absences) with navigation by week. */
-function WeekView({ childId }: { readonly childId: string }) {
-  const { t } = useTranslation();
-  const format = useFormat();
-  const [weekStart, setWeekStart] = useState(() => mondayOf(todayIso()));
-  const week = useOrgQuery<WeekSchedule>(['schedules', childId, 'week'], `/children/${childId}/schedule/week?weekStart=${weekStart}`);
-
-  return (
-    <div>
-      <h3>{t('schedules.week', { from: format.date(weekStart), to: format.date(addDays(weekStart, 6)) })}</h3>
-      <div className="vc-toolbar">
-        <button
-          type="button"
-          className="vc-button vc-button--small"
-          onClick={() => {
-            setWeekStart(addDays(weekStart, -7));
-          }}
-        >
-          {t('schedules.prevWeek')}
-        </button>
-        <button
-          type="button"
-          className="vc-button vc-button--small"
-          onClick={() => {
-            setWeekStart(mondayOf(todayIso()));
-          }}
-        >
-          {t('schedules.thisWeek')}
-        </button>
-        <button
-          type="button"
-          className="vc-button vc-button--small"
-          onClick={() => {
-            setWeekStart(addDays(weekStart, 7));
-          }}
-        >
-          {t('schedules.nextWeek')}
-        </button>
-      </div>
-      <ProblemAlert error={week.error} />
-      {week.isPending ? <Loading /> : null}
-      {week.data === undefined ? null : (
-        <ul className="vc-list">
-          {week.data.days.map((d) => (
-            <li key={d.date}>
-              <strong>
-                {t(weekdayKey(d.weekday))} {format.date(d.date)}
-              </strong>
-              {': '}
-              {d.source === 'ABSENCE' ? (
-                <Badge tone="warning">{t('schedules.source.ABSENCE')}</Badge>
-              ) : d.isExpected ? (
-                `${d.expectedArrival ?? ''}-${d.expectedDeparture ?? ''}`
-              ) : (
-                <span className="vc-muted">{t('schedules.notExpected')}</span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
   );
 }

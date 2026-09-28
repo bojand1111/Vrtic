@@ -1,0 +1,54 @@
+{
+  "profile": {
+    "title": "Profile",
+    "name": "Name",
+    "email": "E-mail",
+    "emailVerified": "confirmed",
+    "emailNotVerified": "not confirmed",
+    "language": "Language for e-mails and notifications",
+    "saveLanguage": "Save language",
+    "languageSaved": "Language saved.",
+    "lastLogin": "Last sign-in",
+    "createdAt": "Account created",
+    "platformAdmin": "Platform administrator",
+    "memberships": "Kindergartens and roles"
+  },
+  "password": {
+    "title": "Change password",
+    "current": "Current password",
+    "submit": "Change password",
+    "done": "Password changed. All other devices were signed out.",
+    "wrongCurrent": "The current password is wrong."
+  },
+  "mfa": {
+    "title": "Two-step verification",
+    "intro": "Protects your account with a code from an authenticator app on your phone.",
+    "on": "On",
+    "off": "Off",
+    "required": "Mandatory for kindergarten owners and platform administrators.",
+    "enable": "Turn on",
+    "regenerate": "Generate new recovery codes",
+    "regenerateIntro": "Old unused recovery codes stop working. You may be asked for your password."
+  },
+  "sessions": {
+    "title": "Active sessions",
+    "device": "Device",
+    "client": "App",
+    "createdAt": "Signed in",
+    "lastSeenAt": "Last activity",
+    "expiresAt": "Valid until",
+    "current": "This device",
+    "mfaVerified": "Two-step verified",
+    "revoke": "Sign out device",
+    "revokeConfirm": "Sign out this device?",
+    "logoutAll": "Sign out everywhere",
+    "logoutAllConfirm": "Sign out on all devices, including this one?",
+    "empty": "No active sessions.",
+    "unknownDevice": "Unknown device",
+    "clientKinds": {
+      "WEB": "Web browser",
+      "ANDROID": "Android app",
+      "IOS": "iOS app"
+    }
+  }
+}

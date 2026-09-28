@@ -5,6 +5,7 @@ import { NavLink, Outlet } from 'react-router';
 import { logout } from '../../api/auth';
 import { useOrg } from '../../api/org';
 import { useSession } from '../../auth/useSession';
+import { NotificationBell } from '../../features/notifications/NotificationBell';
 import { TenantSwitcher } from '../../tenant/TenantSwitcher';
 import { useTenant } from '../../tenant/useTenant';
 import { FEATURES, isFeatureVisible } from '../navigation';
@@ -42,6 +43,7 @@ export function AppLayout() {
         <div className="vc-header-tools">
           <TenantSwitcher />
           <LocaleSwitcher />
+          {state.status === 'authenticated' ? <NotificationBell /> : null}
           {email.length > 0 ? (
             <span>
               {email}

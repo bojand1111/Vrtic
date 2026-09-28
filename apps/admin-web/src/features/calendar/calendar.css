@@ -16,3 +16,9 @@
   display: inline-flex;
   gap: 6px;
 }
+
+/* A day that is a closure day (from /closure-days): marked with a coloured edge. */
+.vc-calendar-closed {
+  border-left: 4px solid var(--vc-danger, #b42318);
+  padding-left: 12px;
+}

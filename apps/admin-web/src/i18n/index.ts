@@ -40,6 +40,24 @@ import mealsEn from '../features/meals/i18n/en.json';
 import settingsSrLatn from '../features/settings/i18n/sr-Latn.json';
 import settingsSrCyrl from '../features/settings/i18n/sr-Cyrl.json';
 import settingsEn from '../features/settings/i18n/en.json';
+import messagesSrLatn from '../features/messages/i18n/sr-Latn.json';
+import messagesSrCyrl from '../features/messages/i18n/sr-Cyrl.json';
+import messagesEn from '../features/messages/i18n/en.json';
+import accountSrLatn from '../features/account/i18n/sr-Latn.json';
+import accountSrCyrl from '../features/account/i18n/sr-Cyrl.json';
+import accountEn from '../features/account/i18n/en.json';
+import notificationsSrLatn from '../features/notifications/i18n/sr-Latn.json';
+import notificationsSrCyrl from '../features/notifications/i18n/sr-Cyrl.json';
+import notificationsEn from '../features/notifications/i18n/en.json';
+import reportsSrLatn from '../features/reports/i18n/sr-Latn.json';
+import reportsSrCyrl from '../features/reports/i18n/sr-Cyrl.json';
+import reportsEn from '../features/reports/i18n/en.json';
+import billingSrLatn from '../features/billing/i18n/sr-Latn.json';
+import billingSrCyrl from '../features/billing/i18n/sr-Cyrl.json';
+import billingEn from '../features/billing/i18n/en.json';
+import organizationsSrLatn from '../features/organizations/i18n/sr-Latn.json';
+import organizationsSrCyrl from '../features/organizations/i18n/sr-Cyrl.json';
+import organizationsEn from '../features/organizations/i18n/en.json';
 import en from './locales/en.json';
 import srCyrl from './locales/sr-Cyrl.json';
 import srLatn from './locales/sr-Latn.json';
@@ -54,9 +72,9 @@ import {
 } from './locale';
 
 // Each business feature owns its own namespace file (src/features/<feature>/i18n/<locale>.json).
-const srLatnAll = { ...srLatn, dashboard: dashboardSrLatn, locations: locationsSrLatn, groups: groupsSrLatn, employees: employeesSrLatn, children: childrenSrLatn, parents: parentsSrLatn, absences: absencesSrLatn, schedules: schedulesSrLatn, attendance: attendanceSrLatn, announcements: announcementsSrLatn, calendar: calendarSrLatn, meals: mealsSrLatn, settings: settingsSrLatn };
-const srCyrlAll = { ...srCyrl, dashboard: dashboardSrCyrl, locations: locationsSrCyrl, groups: groupsSrCyrl, employees: employeesSrCyrl, children: childrenSrCyrl, parents: parentsSrCyrl, absences: absencesSrCyrl, schedules: schedulesSrCyrl, attendance: attendanceSrCyrl, announcements: announcementsSrCyrl, calendar: calendarSrCyrl, meals: mealsSrCyrl, settings: settingsSrCyrl };
-const enAll = { ...en, dashboard: dashboardEn, locations: locationsEn, groups: groupsEn, employees: employeesEn, children: childrenEn, parents: parentsEn, absences: absencesEn, schedules: schedulesEn, attendance: attendanceEn, announcements: announcementsEn, calendar: calendarEn, meals: mealsEn, settings: settingsEn };
+const srLatnAll = { ...srLatn, dashboard: dashboardSrLatn, locations: locationsSrLatn, groups: groupsSrLatn, employees: employeesSrLatn, children: childrenSrLatn, parents: parentsSrLatn, absences: absencesSrLatn, schedules: schedulesSrLatn, attendance: attendanceSrLatn, announcements: announcementsSrLatn, calendar: calendarSrLatn, meals: mealsSrLatn, settings: settingsSrLatn, messages: messagesSrLatn, account: accountSrLatn, notifications: notificationsSrLatn, reports: reportsSrLatn, billing: billingSrLatn, organizations: organizationsSrLatn };
+const srCyrlAll = { ...srCyrl, dashboard: dashboardSrCyrl, locations: locationsSrCyrl, groups: groupsSrCyrl, employees: employeesSrCyrl, children: childrenSrCyrl, parents: parentsSrCyrl, absences: absencesSrCyrl, schedules: schedulesSrCyrl, attendance: attendanceSrCyrl, announcements: announcementsSrCyrl, calendar: calendarSrCyrl, meals: mealsSrCyrl, settings: settingsSrCyrl, messages: messagesSrCyrl, account: accountSrCyrl, notifications: notificationsSrCyrl, reports: reportsSrCyrl, billing: billingSrCyrl, organizations: organizationsSrCyrl };
+const enAll = { ...en, dashboard: dashboardEn, locations: locationsEn, groups: groupsEn, employees: employeesEn, children: childrenEn, parents: parentsEn, absences: absencesEn, schedules: schedulesEn, attendance: attendanceEn, announcements: announcementsEn, calendar: calendarEn, meals: mealsEn, settings: settingsEn, messages: messagesEn, account: accountEn, notifications: notificationsEn, reports: reportsEn, billing: billingEn, organizations: organizationsEn };
 
 export const resources = {
   'sr-Latn': { translation: srLatnAll },

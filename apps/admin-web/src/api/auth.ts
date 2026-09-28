@@ -9,6 +9,9 @@ export interface LoginRequest {
 
 export interface SessionResponse {
   readonly user: SessionUser;
+  /** Session must complete MFA (verify or enrollment) before tenant routes work (E02-B12). */
+  readonly mfaRequired?: boolean;
+  readonly mfaEnrollmentRequired?: boolean;
 }
 
 /**
@@ -41,5 +44,5 @@ export async function getSession(signal?: AbortSignal): Promise<SessionResponse>
   const memberships = response.user.memberships.map((m) =>
     (m.role as string) === 'KINDERGARTEN_OWNER' ? { ...m, role: 'OWNER' as const } : m,
   );
-  return { user: { ...response.user, memberships } };
+  return { ...response, user: { ...response.user, memberships } };
 }

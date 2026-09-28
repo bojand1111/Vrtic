@@ -1,0 +1,59 @@
+{
+  "tabs": {
+    "attendance": "Attendance",
+    "audit": "Audit log"
+  },
+  "group": "Group",
+  "allGroups": "All groups",
+  "child": "Child",
+  "exportCsv": "Export CSV",
+  "exporting": "Exporting...",
+  "invalidRange": "Choose a period (the start date must not be after the end date).",
+  "nothingCounted": "The selected period is in the future: no attendance data yet.",
+  "countedRange": "Counted days: {{from}} to {{to}} (future days are not counted).",
+  "totals": "Totals",
+  "totalsLabels": {
+    "workingDays": "Working days",
+    "expectedChildDays": "Expected (child-days)",
+    "presentChildDays": "Present",
+    "absentChildDays": "Absent",
+    "notArrivedChildDays": "Not arrived",
+    "unscheduledChildDays": "Unscheduled present",
+    "lateArrivals": "Late arrivals",
+    "attendanceRatePct": "Attendance"
+  },
+  "percent": "{{value}} %",
+  "byGroup": "By group",
+  "byChild": "By child",
+  "empty": "No children enrolled in the selected period.",
+  "columns": {
+    "expected": "Expected",
+    "present": "Present",
+    "absent": "Absent",
+    "notArrived": "Not arrived",
+    "unscheduled": "Unscheduled",
+    "late": "Late arrivals",
+    "rate": "Attendance",
+    "sick": "Sick",
+    "vacation": "Vacation",
+    "otherAbsence": "Other absence"
+  },
+  "audit": {
+    "action": "Action",
+    "entityType": "Record type",
+    "entityId": "Record",
+    "result": "Result",
+    "results": {
+      "SUCCESS": "Success",
+      "DENIED": "Denied",
+      "FAILED": "Failed"
+    },
+    "when": "Time",
+    "actor": "User",
+    "details": "Details",
+    "system": "system",
+    "empty": "No entries for the selected filters.",
+    "previous": "Previous page",
+    "next": "Next page"
+  }
+}

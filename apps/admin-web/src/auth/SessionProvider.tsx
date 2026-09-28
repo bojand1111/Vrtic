@@ -38,7 +38,7 @@ export function SessionProvider({ children, initialState }: SessionProviderProps
   const refresh = useCallback(async () => {
     try {
       const response = await getSession();
-      setState({ status: 'authenticated', user: response.user });
+      setState({ status: 'authenticated', user: response.user, mfaPending: response.mfaRequired === true || response.mfaEnrollmentRequired === true });
     } catch {
       setState(UNAUTHENTICATED);
     }
@@ -60,7 +60,7 @@ export function SessionProvider({ children, initialState }: SessionProviderProps
     const controller = new AbortController();
     getSession(controller.signal)
       .then((response) => {
-        setState({ status: 'authenticated', user: response.user });
+        setState({ status: 'authenticated', user: response.user, mfaPending: response.mfaRequired === true || response.mfaEnrollmentRequired === true });
       })
       .catch(() => {
         if (!controller.signal.aborted) {

@@ -1,0 +1,24 @@
+{
+  "bell": "Notifikacije",
+  "bellUnread": "Notifikacije, nepročitano: {{count}}",
+  "latest": "Najnovije",
+  "empty": "Nema notifikacija.",
+  "all": "Sve notifikacije",
+  "markAllRead": "Označi sve kao pročitano",
+  "unreadOnly": "Samo nepročitane",
+  "unread": "nepročitano",
+  "generic": "Nova notifikacija",
+  "announcement": {
+    "published": "Novo obaveštenje: {{title}}"
+  },
+  "absence": {
+    "reported": "Prijavljeno odsustvo: {{childName}} ({{dateFrom}} – {{dateTo}})",
+    "cancelled": "Otkazano odsustvo: {{childName}} ({{dateFrom}} – {{dateTo}})"
+  },
+  "guardian": {
+    "confirmed": "Vrtić je potvrdio vašu vezu sa detetom: {{childName}}"
+  },
+  "message": {
+    "received": "Nova poruka od {{senderName}} (dete: {{childName}})"
+  }
+}

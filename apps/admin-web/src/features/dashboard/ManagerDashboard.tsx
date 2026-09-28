@@ -59,6 +59,10 @@ export function ManagerDashboard() {
               <h3>{t('dashboard.absencesToday')}</h3>
               <p className="vc-stat">{query.data.absencesToday}</p>
             </Link>
+            <Link className="vc-card" to={`/schedules?tab=changes&late=1&date=${date}`}>
+              <h3>{t('dashboard.lateScheduleChanges')}</h3>
+              <p className="vc-stat">{query.data.lateScheduleChangesToday}</p>
+            </Link>
             <Link className="vc-card" to="/parents">
               <h3>{t('dashboard.guardiansPending')}</h3>
               <p className="vc-stat">{query.data.guardiansPending}</p>

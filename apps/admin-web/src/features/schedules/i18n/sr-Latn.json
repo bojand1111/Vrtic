@@ -37,7 +37,9 @@
   "source": {
     "ABSENCE": "Odsustvo",
     "TEMPLATE": "Po rasporedu",
-    "NONE": "Nije planirano"
+    "NONE": "Nije planirano",
+    "CLOSURE": "Neradni dan",
+    "OVERRIDE": "Izmena za dan"
   },
   "notExpected": "ne dolazi",
   "group": "Grupa",
@@ -55,5 +57,55 @@
   },
   "noLinkedChildren": "Za vaš nalog još nije povezano nijedno dete.",
   "child": "Dete",
-  "readOnlyHint": "Raspored možete da pregledate, ali nemate pravo da ga menjate."
+  "readOnlyHint": "Raspored možete da pregledate, ali nemate pravo da ga menjate.",
+  "tabs": {
+    "expected": "Očekivani danas",
+    "changes": "Izmene",
+    "closures": "Neradni dani",
+    "children": "Raspored deteta"
+  },
+  "sourceColumn": "Izvor",
+  "plan": "Plan",
+  "lateChange": "Kasna izmena",
+  "frozen": "zaključano",
+  "override": {
+    "change": "Promeni dan",
+    "reset": "Vrati na šablon",
+    "confirmReset": "Ukloniti izmenu za ovaj dan? Važiće nedeljni raspored.",
+    "title": "Izmena za {{date}}",
+    "lateTitle": "Kasna izmena",
+    "lateWarning": "Rok za izmenu ovog dana je prošao ({{deadline}}, {{hours}} h pre otvaranja). Izmena će biti sačuvana, a vrtić će je videti kao kasnu.",
+    "lateWarningManager": "Rok za izmenu ovog dana je prošao ({{deadline}}, {{hours}} h pre otvaranja). Izmena će biti sačuvana i označena kao kasna.",
+    "deadlineHint": "Izmene posle {{deadline}} označavaju se kao kasne.",
+    "deadlineRule": "Rok za izmenu: {{hours}} h pre otvaranja vrtića tog dana. Kasnije izmene se prihvataju, ali se označavaju kao kasne.",
+    "templateSays": "Po nedeljnom rasporedu: {{arrival}} do {{departure}}.",
+    "templateNone": "Po nedeljnom rasporedu dete ovog dana ne dolazi.",
+    "reason": "Napomena (nije obavezna)"
+  },
+  "changes": {
+    "hint": "Izmene rasporeda koje počinju izabranog dana. Kasne izmene su unete posle roka.",
+    "lateOnly": "Samo kasne izmene",
+    "empty": "Nema izmena rasporeda za izabrani dan.",
+    "kind": "Izmena",
+    "before": "Pre",
+    "after": "Posle",
+    "by": "Uneo/la",
+    "when": "Vreme unosa",
+    "backToTemplate": "po nedeljnom rasporedu",
+    "kinds": {
+      "TEMPLATE_REPLACED": "Novi nedeljni raspored",
+      "OVERRIDE_SET": "Izmena za dan",
+      "OVERRIDE_REMOVED": "Izmena uklonjena",
+      "WEEK_UPDATED": "Izmena nedelje"
+    }
+  },
+  "closures": {
+    "hint": "Neradnim danima se deca ne očekuju. Neradni dan važi za ceo vrtić ili za jedan objekat.",
+    "showPast": "Prikaži i prošle dane",
+    "add": "Dodaj neradni dan",
+    "empty": "Nema unetih neradnih dana.",
+    "scope": "Važi za",
+    "wholeOrganization": "Ceo vrtić",
+    "namePlaceholder": "npr. Dan državnosti"
+  }
 }

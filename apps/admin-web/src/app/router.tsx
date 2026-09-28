@@ -6,6 +6,7 @@ import { AttendancePage } from '../features/attendance/AttendancePage';
 import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage';
 import { InvitePage } from '../features/auth/InvitePage';
 import { LoginPage } from '../features/auth/LoginPage';
+import { MfaPage } from '../features/auth/MfaPage';
 import { ResetPasswordPage } from '../features/auth/ResetPasswordPage';
 import { VerifyEmailPage } from '../features/auth/VerifyEmailPage';
 import { BillingPage } from '../features/billing/BillingPage';
@@ -16,6 +17,8 @@ import { EmployeesPage } from '../features/employees/EmployeesPage';
 import { GroupsPage } from '../features/groups/GroupsPage';
 import { LocationsPage } from '../features/locations/LocationsPage';
 import { MealsPage } from '../features/meals/MealsPage';
+import { MessagesPage } from '../features/messages/MessagesPage';
+import { AccountPage } from '../features/account/AccountPage';
 import { OrganizationsPage } from '../features/organizations/OrganizationsPage';
 import { ParentsPage } from '../features/parents/ParentsPage';
 import { PhotosPage } from '../features/photos/PhotosPage';
@@ -38,6 +41,8 @@ export const routes: RouteObject[] = [
   { path: '/verify-email', Component: VerifyEmailPage, ErrorBoundary: RootErrorBoundary },
   { path: '/forgot-password', Component: ForgotPasswordPage, ErrorBoundary: RootErrorBoundary },
   { path: '/reset-password', Component: ResetPasswordPage, ErrorBoundary: RootErrorBoundary },
+  // E02-B12: MFA verification / mandatory enrollment right after the password step (limited session).
+  { path: '/mfa', Component: MfaPage, ErrorBoundary: RootErrorBoundary },
   {
     path: '/',
     Component: ProtectedShell,
@@ -60,6 +65,8 @@ export const routes: RouteObject[] = [
       { path: 'reports', Component: ReportsPage },
       { path: 'settings', Component: SettingsPage },
       { path: 'billing', Component: BillingPage },
+      { path: 'messages', Component: MessagesPage },
+      { path: 'account', Component: AccountPage },
       { path: '*', Component: NotFoundPage },
     ],
   },
