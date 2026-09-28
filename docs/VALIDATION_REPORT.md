@@ -87,3 +87,33 @@ Izvršeni backend testovi pokrivaju obavezne scenarije iz brief-a §27: dva tena
 
 **EPIC 02 – Autentifikacija, sesije i dozvole** (`docs/DEVELOPMENT_ROADMAP.md`, taskovi `E02-*`) je u toku: login sa Argon2id, opaque access/refresh tokeni sa rotacijom i detekcijom ponovne upotrebe, web CSRF/Origin, logout tekuće sesije; E02-B14 (`MembershipResolver`, tenant transakcija, `/me/memberships`, `TestTenants` fixture = E02-D02) je urađen 28. 9.; E02-B08 (logout-all, lista i opoziv sesija) je urađen 28. 9.; E02-B04/B05/B09/B20, E02-B13, E02-B15, E02-B16, E02-B10 i E02-D03 su urađeni 28. 9.; preostaju po dogovorenom redosledu: E02-B11–B12 (TOTP MFA i MFA politika), E02-B17–B19 (čišćenje, audit/outbox, dokumentacija), E02-D03 (seed lozinke iz `SEED_DEV_PASSWORD`).
 
+## 7. Dopuna 28. 9. 2026. (uveče): poslovni moduli za demo svih uloga
+
+Na zahtev vlasnika proizvoda urađen je prvi klikabilan krug poslovnih modula (delovi EPIC 03-13 i 16), da bi se aplikacija testirala kao vlasnik, administrator, vaspitač i roditelj. EPIC 02 preostali taskovi (MFA E02-B11/B12, B17-B19) nisu rađeni.
+
+**Implementirano (kod):**
+- Flyway `V5__core_business.sql`: 17 tabela doslovno iz `docs/database/schema.sql` (children, enrollments, guardians, pickup_persons, schedule_templates/_days, absences, attendance_days/_visits/_events, announcements/_audiences/_recipients, consent_policies samo kao FK cilj, calendar_events, menu_days/_items) + RLS ENABLE/FORCE, `tenant_isolation`, `owner_maintenance`, grantovi.
+- Zajednički backend: `TenantApi` (tenantRead/tenantWrite sa CSRF, tenant transakcija, audit), `authz/Scopes.kt` (vaspitač: dodeljene grupe; roditelj: potvrđene veze; 404 van opsega), `db/Jdbc.kt`, `http/Validation.kt`, globalno mapiranje SQL grešaka ograničenja (unique/exclusion 409, FK/check 422).
+- Moduli: objekti, grupe i dodele vaspitača, zaposleni, članstva (opoziv sa reautentifikacijom), pozivnice (kreiranje, link u DEV logu, opoziv; prihvatanje kreira profil zaposlenog ili PENDING vezu roditelja), deca, upisi, veze roditelja, osobe za preuzimanje, nedeljni raspored, odsustva, prisustvo (event log + projekcija, idempotentno po `commandId`, korekcije), obaveštenja (nacrt, objava sa snimkom primalaca, čitanje, arhiva), kalendar, jelovnik, kontrolna tabla (`GET /dashboard`).
+- Web: svi navedeni ekrani sa izmenom podataka, prikaz po ulozi (meni sakriva ono što uloga ne može), javne stranice `/invite`, `/verify-email`, `/forgot-password`, `/reset-password`.
+- Demo podaci u `dev_seed.sql` (odeljak V5) i lozinke za sve demo naloge (`dev-set-password` prima više adresa); `start-vrtic.ps1` učitava seed pri svakom startu i lozinke samo prvi put. Uputstvo: `docs/MANUAL_TEST_DEMO.md`.
+
+**Izvršene provere (28. 9., ova mašina, Temurin 21 + nativni PostgreSQL 17.11 na portu 5433):**
+
+| Provera | Rezultat |
+|---|---|
+| `VRTIC_TEST_DB=1 ./gradlew build --rerun-tasks` | PROŠLO: 85 testova, 0 palih, 0 preskočenih (novi integracioni testovi: Locations, Groups, Staff, Children, Absences, Schedules, Attendance, Announcement, Calendar, Menu, Dashboard) |
+| `java -jar ... migrate` | PROŠLO: "Successfully applied 1 migration ... now at version v5" |
+| Seed `dev_seed.sql` kao app_owner | PROŠLO: COMMIT (16 dece, 22 veze roditelja, rasporedi, odsustvo, obaveštenja, događaji, jelovnik) |
+| Web `tsc --noEmit`, `eslint src`, `vitest run` | PROŠLO: 10 fajlova, 36 testova |
+| Ručni klik-test u pregledaču (fat jar + vite dev) | PROŠLO za: prijavu vlasnika, roditelja i vaspitača; svi ekrani iz menija se iscrtavaju bez greške u konzoli; vlasnik zabeležio dolazak (brojači se ažurirali); roditelj prijavio odsustvo; vaspitač vidi samo svoju grupu, roditelj samo svoju decu; API log bez ERROR linija |
+| `rls_negative_tests.sql` | PALO na tvrdnji "tenant A: sessions visible": test pretpostavlja da seed admin nema sesiju, a u dev bazi postoji njegova sesija od ručne prijave (politika `sessions_self`). Nije posledica V5; test treba da ne zavisi od postojećih sesija. |
+
+**Nije izvršeno / poznata odstupanja:**
+- `docs/openapi.yaml` nije ažuriran za dodatke: `POST /employees`, `GET /parents`, `POST /children/{id}/guardians`, `GET /children/{id}/enrollments`, `GET /children/{id}/pickup-persons`, `GET /schedules/expected`, PUT alias rute, proširenje tela pozivnice (PARENT + `childId`). OpenAPI lint zato nije ponovo pokretan.
+- Idempotency-Key se prima ali ne čuva; liste vraćaju do `limit` stavki sa `nextCursor: null`; `sort` se u delu lista ignoriše; null polja se izostavljaju iz JSON-a.
+- Nisu urađeni: `/attendance/sync` (offline mobilni paket), brisanje jelovnika, prilozi obaveštenja, zdravstveni profil, izmene rasporeda po danu, neradni dani, `daily_plans`, fotografije, poruke, saglasnosti, izveštaji, naplata, MFA. Vaspitač ne može da kreira obaveštenja ni događaje (matrica dozvola to ne daje, iako ugovor pominje).
+- Potvrda i opoziv veze roditelja ne traže reautentifikaciju (ugovor ima `x-requires-reauthentication`), jer web još nema taj dijalog na tom mestu.
+- Kontrolna tabla broji "kasni" samo za decu koja nisu stigla; ekran prisustva u "kasni" broji i decu koja su stigla sa zakašnjenjem (definicija iz ugovora). Brojke se zato mogu razlikovati.
+- Predlozi za šemu (nisu rađeni): DELETE na `attendance_visits` za čisto poništavanje dolaska; `deleted_at` ili DELETE na `menu_days`; trigger koji proverava da je veza roditelja vezana za PARENT članstvo (sada samo u aplikaciji).
+- Android/iOS nisu menjani ni građeni.

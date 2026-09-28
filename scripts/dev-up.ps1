@@ -82,17 +82,22 @@ Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
 
 Step "Dev lozinke za seed naloge (SEED_DEV_PASSWORD)"
 $env:SEED_DEV_PASSWORD = $DevPassword
-foreach ($email in @("vlasnik@happykids.example.test", "admin@happykids.example.test", "vaspitac1@happykids.example.test", "roditelj12@example.test", "platform.admin@example.test")) {
-    & java -jar $jar dev-set-password $email 2>&1 | Select-String "dev-set-password|No such|violates"
-    if ($LASTEXITCODE -ne 0) { Fail "dev-set-password nije prosao za $email" }
-}
+$demoEmails = @("platform.admin@example.test",
+    "vlasnik@happykids.example.test", "admin@happykids.example.test",
+    "vaspitac1@happykids.example.test", "vaspitac2@happykids.example.test", "vaspitac3@happykids.example.test") +
+    (1..12 | ForEach-Object { "roditelj{0:D2}@example.test" -f $_ }) +
+    @("vlasnik@suncica.example.test", "vaspitac@suncica.example.test", "roditelj@suncica.example.test")
+& java -jar $jar dev-set-password @demoEmails 2>&1 | Select-String "dev-set-password|No such|violates"
+if ($LASTEXITCODE -ne 0) { Fail "dev-set-password nije prosao" }
 Remove-Item Env:SEED_DEV_PASSWORD -ErrorAction SilentlyContinue
 
 Write-Host "`nSpremno. Nalozi (lozinka: $DevPassword):" -ForegroundColor Green
 Write-Host "  vlasnik@happykids.example.test   OWNER  Happy Kids"
 Write-Host "  admin@happykids.example.test     ADMIN  Happy Kids"
-Write-Host "  vaspitac1@happykids.example.test TEACHER Happy Kids"
+Write-Host "  vaspitac1@happykids.example.test TEACHER Happy Kids (Bubamare; vaspitac2/3: Leptirici)"
+Write-Host "  roditelj01@example.test          PARENT Happy Kids (Luka i Andrej Djordjevic; roditelj01..12)"
 Write-Host "  roditelj12@example.test          PARENT Happy Kids + TEACHER Suncica"
+Write-Host "  vlasnik@suncica.example.test     OWNER  Suncica (drugi vrtic, izolacija podataka)"
 Write-Host "  platform.admin@example.test      SUPER_ADMIN (platforma trazi MFA, jos nije implementiran)"
 Write-Host "Happy Kids id: 22222222-0000-0000-0000-000000000001   Suncica id: 22222222-0000-0000-0000-000000000002"
 Write-Host "Tokovi za testiranje: docs\MANUAL_TEST_EPIC02.md"

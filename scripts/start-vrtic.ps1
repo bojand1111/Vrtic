@@ -10,6 +10,7 @@ $root  = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $tools = "C:\Posao\Vrtic-tools"
 $pgBin = "$tools\pgsql\bin"; $pgData = "$tools\pgdata"; $dbPort = 5433
 $jar   = "$root\backend\build\libs\vrtic-backend-all.jar"
+$demoPassword = "Pilot-Lozinka-2026!"
 
 function Step($m) { Write-Host "== $m" -ForegroundColor Cyan }
 function Fail($m) { Write-Host "GRESKA: $m" -ForegroundColor Red; Read-Host "Enter za izlaz" | Out-Null; exit 1 }
@@ -33,6 +34,28 @@ if ($LASTEXITCODE -ne 0) {
 Step "Migracije"
 & java -jar $jar migrate 2>&1 | Select-String "Migrations applied|Exception" | ForEach-Object { $_.Line }
 if ($LASTEXITCODE -ne 0) { Fail "Migracije nisu prosle." }
+
+Step "Demo podaci (seed je idempotentan: dopunjava samo ono sto nedostaje, npr. jelovnik tekuce nedelje)"
+$env:PGPASSWORD = "owner-pw"
+& "$pgBin\psql.exe" -q -v ON_ERROR_STOP=1 -h 127.0.0.1 -p $dbPort -U app_owner -d vrtic -f "$root\docs\database\seed\dev_seed.sql" *> "$tools\seed.log"
+$seedCode = $LASTEXITCODE
+Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+if ($seedCode -ne 0) { Fail "Seed nije prosao, vidi $tools\seed.log" }
+# Lozinke demo naloga se postavljaju samo prvi put, da promena lozinke iz aplikacije ne bi bila pregazena.
+$marker = "$tools\demo-passwords.done"
+if (-not (Test-Path $marker)) {
+    $env:SEED_DEV_PASSWORD = $demoPassword
+    $demoEmails = @("platform.admin@example.test", "vlasnik@happykids.example.test", "admin@happykids.example.test",
+        "vaspitac1@happykids.example.test", "vaspitac2@happykids.example.test", "vaspitac3@happykids.example.test") +
+        (1..12 | ForEach-Object { "roditelj{0:D2}@example.test" -f $_ }) +
+        @("vlasnik@suncica.example.test", "vaspitac@suncica.example.test", "roditelj@suncica.example.test")
+    & java -jar $jar dev-set-password @demoEmails 2>&1 | Select-String "No such|violates|only with"
+    $pwCode = $LASTEXITCODE
+    Remove-Item Env:SEED_DEV_PASSWORD -ErrorAction SilentlyContinue
+    if ($pwCode -ne 0) { Fail "Postavljanje demo lozinki nije proslo." }
+    Set-Content -Path $marker -Value (Get-Date -Format s)
+    Write-Host "demo lozinke postavljene"
+} else { Write-Host "demo lozinke vec postavljene (obrisi $marker za ponovno postavljanje)" }
 
 Step "API na http://127.0.0.1:8080"
 if (PortBusy 8080) {
@@ -60,6 +83,11 @@ if (-not (PortBusy 5173)) {
 } else { Write-Host "vec radi" }
 
 Start-Process "http://localhost:5173"
-Write-Host "`nOtvoreno. Nalog za probu: vlasnik@happykids.example.test / Pilot-Lozinka-2026!" -ForegroundColor Green
-Write-Host "Tokovi za testiranje: docs\MANUAL_TEST_EPIC02.md. Gasenje svega: scripts\stop-vrtic.ps1"
+Write-Host "`nOtvoreno. Lozinka za sve demo naloge: $demoPassword" -ForegroundColor Green
+Write-Host "  vlasnik@happykids.example.test    Vlasnik (sve + podesavanja)"
+Write-Host "  admin@happykids.example.test      Administrator"
+Write-Host "  vaspitac1@happykids.example.test  Vaspitac (grupa Bubamare)"
+Write-Host "  roditelj01@example.test           Roditelj (Luka i Andrej Djordjevic)"
+Write-Host "  vlasnik@suncica.example.test      Vlasnik drugog vrtica (Suncica)"
+Write-Host "Tokovi za testiranje: docs\MANUAL_TEST_DEMO.md. Gasenje svega: scripts\stop-vrtic.ps1"
 Start-Sleep -Seconds 4
