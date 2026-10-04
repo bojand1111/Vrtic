@@ -4,6 +4,7 @@ Thumbs.db
 .idea/
 *.iml
 .vscode/
+.claude/
 *.swp
 
 # Secrets and local config
